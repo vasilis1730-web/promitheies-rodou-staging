@@ -14,6 +14,7 @@ import { PGlite } from '@electric-sql/pglite';
 
 const ADMIN_ID = '11111111-1111-1111-1111-111111111111';
 const migrationsDir = fileURLToPath(new URL('../supabase/migrations/', import.meta.url));
+const DIAGNOSTIC_MIGRATION = '202608070003_security_hardening.sql';
 
 function read(relative) {
   return fs.readFileSync(new URL(relative, import.meta.url), 'utf8');
@@ -66,7 +67,7 @@ async function migrationFailureDiagnostics(db) {
   return diagnostics;
 }
 
-async function installAll() {
+async function installAll({ preHardeningDiagnostic = false } = {}) {
   const db = new PGlite();
   await db.exec(`
     create role anon nologin;
@@ -89,6 +90,11 @@ async function installAll() {
     .replace(/create extension if not exists pgcrypto;?/gi, ''));
 
   for (const name of allMigrationFiles()) {
+    if (preHardeningDiagnostic && name === DIAGNOSTIC_MIGRATION) {
+      const diagnostics = await migrationFailureDiagnostics(db);
+      throw new Error(`PRE-70003 Diagnostics: ${JSON.stringify(diagnostics)}`);
+    }
+
     const sql = fs.readFileSync(path.join(migrationsDir, name), 'utf8')
       .replace(/create extension if not exists pgcrypto;?/gi, '');
     try {
@@ -113,6 +119,13 @@ async function installAll() {
 
   return db;
 }
+
+test('diagnostic: καταγράφει το clean-install state ακριβώς πριν από 70003', async () => {
+  await assert.rejects(
+    () => installAll({ preHardeningDiagnostic: true }),
+    /PRE-70003 Diagnostics:/
+  );
+});
 
 test('clean install εφαρμόζει αυτόματα ΟΛΕΣ τις migrations και φτάνει σε schema 36.6.3', async () => {
   const db = await installAll();
