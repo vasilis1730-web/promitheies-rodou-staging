@@ -16,23 +16,56 @@ jobs:
         with:
           ref: agent/v36-6-3-production-readiness
 
-      - name: Patch CSP hash
+      - name: Recompute inline-script CSP hashes
         run: |
           python - <<'PY'
           from pathlib import Path
+          import base64, hashlib, re
+
           p = Path('index.html')
-          s = p.read_text(encoding='utf-8')
-          old = 'sha256-pQIp9F6QMXuSctnEGFgCeUJ207PIXdLe4Mo/t7S2E1o='
-          new = 'sha256-bEDO0O5Tngmv1NuA/ODkoDNVsuof0+p8jtmo8bPlu8s='
-          if s.count(old) != 1:
-              raise SystemExit('Old CSP hash is not present exactly once')
-          p.write_text(s.replace(old, new), encoding='utf-8')
+          html = p.read_text(encoding='utf-8')
+
+          meta = re.search(r'<meta\s+http-equiv="Content-Security-Policy"\s+content="([^"]+)"', html, re.I)
+          if not meta:
+              raise SystemExit('CSP meta tag not found')
+          csp = meta.group(1)
+
+          scripts = [m.group(1) for m in re.finditer(r'<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)</script>', html, re.I)]
+          if len(scripts) != 2:
+              raise SystemExit(f'Expected exactly 2 inline scripts, found {len(scripts)}')
+
+          computed = [
+              'sha256-' + base64.b64encode(hashlib.sha256(script.encode('utf-8')).digest()).decode('ascii')
+              for script in scripts
+          ]
+
+          directive = re.search(r'(?<!-)\bscript-src\s+([^;]+)', csp)
+          if not directive:
+              raise SystemExit('script-src directive not found')
+          body = directive.group(1)
+          old_hashes = re.findall(r"'sha256-[A-Za-z0-9+/=]+'", body)
+          if len(old_hashes) != 2:
+              raise SystemExit(f'Expected exactly 2 CSP script hashes, found {len(old_hashes)}')
+
+          kept = [token for token in body.split() if not token.startswith("'sha256-")]
+          new_body = ' '.join(kept + [f"'{h}'" for h in computed])
+          new_csp = csp[:directive.start(1)] + new_body + csp[directive.end(1):]
+
+          if html.count(csp) != 1:
+              raise SystemExit('CSP content is not unique')
+          updated = html.replace(csp, new_csp, 1)
+          p.write_text(updated, encoding='utf-8')
+          print('Computed CSP hashes:', ', '.join(computed))
           PY
 
-      - name: Commit patch
+      - name: Commit patch if needed
         run: |
+          if git diff --quiet -- index.html; then
+            echo 'CSP hashes already match inline scripts.'
+            exit 0
+          fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add index.html
-          git commit -m 'fix: refresh CSP hash for v36.6.3'
+          git commit -m 'fix: refresh CSP hashes for v36.6.3'
           git push origin HEAD:agent/v36-6-3-production-readiness
