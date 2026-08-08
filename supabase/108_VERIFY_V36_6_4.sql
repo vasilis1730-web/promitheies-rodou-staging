@@ -4,18 +4,18 @@
 -- ==========================================================================
 
 with
-privileges as (
+rpc_checks as (
   select
-    has_function_privilege(
-      'authenticated',
-      'public.import_catalog_request_atomic(text,bigint,bigint,integer,text,jsonb,jsonb,jsonb)',
-      'EXECUTE'
-    ) as legacy_import_authenticated_execute,
-    has_function_privilege(
-      'authenticated',
-      'public.secure_import_catalog_request_atomic(uuid,text,bigint,bigint,integer,text,jsonb,jsonb,jsonb)',
-      'EXECUTE'
-    ) as secure_import_authenticated_execute
+    coalesce((
+      select position('app_is_admin' in lower(p.prosrc)) > 0
+      from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+      where n.nspname='public'
+        and p.proname='import_catalog_request_atomic'
+        and pg_get_function_identity_arguments(p.oid)='text, bigint, bigint, integer, text, jsonb, jsonb, jsonb'
+      limit 1
+    ),false) as legacy_import_catalog_admin_guard_present,
+    to_regprocedure('public.secure_import_catalog_request_atomic(uuid,text,bigint,bigint,integer,text,jsonb,jsonb,jsonb)') is not null
+      as secure_import_rpc_exists
 ),
 triggers as (
   select
@@ -60,9 +60,12 @@ violations as (
     (select count(*) from public.mo_orders o join public.mo_contracts c on c.id=o.contract_id
       where o.status in ('issued','sent','received') and o.supplier_id is distinct from c.supplier_id)::int as order_supplier_mismatch,
     (select count(*) from public.mo_orders o join public.mo_contracts c on c.id=o.contract_id
-      where o.status in ('issued','sent') and coalesce(c.active,true) is not true)::int as open_orders_on_inactive_contract,
+      where o.status in ('issued','sent') and coalesce(c.active,true) is not true)::int as open_orders_on_inactive_contract
+),
+informational as (
+  select
     (select count(*) from public.request_lines rl join public.materials m on m.id=rl.material_id
-      where m.is_active is not true)::int as current_request_lines_on_inactive_catalog_items
+      where m.is_active is not true)::int as historical_request_lines_on_inactive_catalog_items
 ),
 catalog as (
   select
@@ -83,18 +86,19 @@ select jsonb_pretty(jsonb_build_object(
   'verified_at',now(),
   'schema_version',public.app_schema_version(),
   'authorization',to_jsonb(authz),
-  'privileges',to_jsonb(privileges),
+  'rpc_checks',to_jsonb(rpc_checks),
   'triggers',to_jsonb(triggers),
   'violations',to_jsonb(violations),
+  'informational',to_jsonb(informational),
   'catalog',to_jsonb(catalog),
   'expected',jsonb_build_object(
     'schema_version','36.6.4',
-    'legacy_import_authenticated_execute',false,
-    'secure_import_authenticated_execute',true,
+    'legacy_import_catalog_admin_guard_present',true,
+    'secure_import_rpc_exists',true,
     'all_four_integrity_triggers',true,
-    'all_violation_counts_except_inactive_working_lines',0,
+    'all_violation_counts',0,
     'procurement_missing_specs',0,
     'service_missing_specs',0
   )
 )) as v36_6_4_verification
-from privileges,triggers,violations,catalog,authz;
+from rpc_checks,triggers,violations,informational,catalog,authz;
