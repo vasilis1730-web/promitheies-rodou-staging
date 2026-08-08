@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   finalize:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -26,7 +27,6 @@ jobs:
           from pathlib import Path
           import json,re
 
-          # package.json
           p=Path('package.json')
           obj=json.loads(p.read_text(encoding='utf-8'))
           if obj.get('version')!='36.6.3':
@@ -34,18 +34,20 @@ jobs:
           obj['version']='36.6.4'
           p.write_text(json.dumps(obj,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
 
-          # index.html — exact current-version replacements only.
           p=Path('index.html')
           s=p.read_text(encoding='utf-8')
-          replacements={
-            'v36.6.3 PRODUCTION READINESS':'v36.6.4 PHASE 2 INTEGRITY',
+          visible_old='v36.6.3 PRODUCTION READINESS'
+          if s.count(visible_old)!=2:
+              raise SystemExit(f'Expected two visible old version labels, found {s.count(visible_old)}')
+          s=s.replace(visible_old,'v36.6.4 PHASE 2 INTEGRITY')
+
+          exact={
             "APP_VERSION='v36.6.3-production-readiness'":"APP_VERSION='v36.6.4-phase2-integrity'",
             "REQUIRED_SCHEMA_VERSION='36.6.3'":"REQUIRED_SCHEMA_VERSION='36.6.4'",
           }
-          for old,new in replacements.items():
-              count=s.count(old)
-              if count!=1:
-                  raise SystemExit(f'Expected exactly one {old!r}, found {count}')
+          for old,new in exact.items():
+              if s.count(old)!=1:
+                  raise SystemExit(f'Expected exactly one {old!r}, found {s.count(old)}')
               s=s.replace(old,new)
 
           m=re.search(r"const COMPATIBLE_EXCEL_VERSIONS=new Set\(\[([^\]]*)\]\);",s)
@@ -58,7 +60,6 @@ jobs:
               s=s[:m.start(1)]+inner+s[m.end(1):]
           p.write_text(s,encoding='utf-8')
 
-          # Update only frontend schema mocks/assertions that represent the current deployed schema.
           for p in Path('tests').glob('*.test.mjs'):
               s=p.read_text(encoding='utf-8')
               original=s
@@ -66,7 +67,6 @@ jobs:
               s=s.replace("data: '36.6.3'","data: '36.6.4'")
               s=s.replace("{ data: '36.6.3', error: null }","{ data: '36.6.4', error: null }")
               s=s.replace("REQUIRED_SCHEMA_VERSION='36\\.6\\.3'","REQUIRED_SCHEMA_VERSION='36\\.6\\.4'")
-              # Assertions specifically naming the current frontend app version.
               s=s.replace("v36.6.3-production-readiness","v36.6.4-phase2-integrity")
               if s!=original:
                   p.write_text(s,encoding='utf-8')
