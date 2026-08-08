@@ -1,5 +1,5 @@
 /*
- * PRODUCTION READINESS — v36.6.3
+ * PRODUCTION READINESS — v36.6.4
  *
  * Δεν υπάρχει χειροκίνητη λίστα migrations: διαβάζονται όλα τα .sql από
  * supabase/migrations ταξινομημένα, ώστε κάθε νέα migration να μπαίνει
@@ -76,15 +76,16 @@ async function installAll() {
   return db;
 }
 
-test('clean install εφαρμόζει αυτόματα ΟΛΕΣ τις migrations και φτάνει σε schema 36.6.3', async () => {
+test('clean install εφαρμόζει αυτόματα ΟΛΕΣ τις migrations και φτάνει σε schema 36.6.4', async () => {
   const db = await installAll();
   try {
     const migrations = allMigrationFiles();
     assert.ok(migrations.includes('202608070002_technical_specs_transfer.sql'));
     assert.ok(migrations.includes('202608070003_security_hardening.sql'));
     assert.ok(migrations.includes('202608080001_v36_6_3_authorization_readiness.sql'));
+    assert.ok(migrations.includes('202608090001_v36_6_4_phase2_integrity.sql'));
 
-    assert.equal(await scalar(db, `select public.app_schema_version()`), '36.6.3');
+    assert.equal(await scalar(db, `select public.app_schema_version()`), '36.6.4');
     assert.equal(await scalar(db,
       `select to_regprocedure('public.apply_technical_specs_import()') is not null`), true);
     assert.equal(await scalar(db,
