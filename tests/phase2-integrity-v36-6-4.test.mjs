@@ -73,15 +73,21 @@ async function prepareContract(db){
   const contract=await scalar(db,`select public.save_contract_atomic(null,$1,$2,'Contract',null,null,date '2026-08-01',date '2026-08-31',24)`,[lock.study_id,supplierId]);
   const item=(await db.query(`select id,unit_price from public.mo_contract_items where contract_id=$1 order by id limit 1`,[contract.contract_id])).rows[0];
   const items=JSON.stringify([{contract_item_id:String(item.id),quantity:1,unit_price:Number(item.unit_price),description:'x',unit:'τεμ.'}]);
-  return {lock,contract,supplierId,receiverId,items};
+  return {unitId,groupId,materialId,lock,contract,supplierId,receiverId,items};
 }
 
-test('legacy import_catalog_request_atomic δεν είναι callable από authenticated ενώ το secure wrapper παραμένει API RPC',async()=>{
+test('clean install φτάνει σε schema 36.6.4 με τα νέα integrity triggers ενεργά',async()=>{
   const db=await install();
   try{
     assert.equal(await scalar(db,`select public.app_schema_version()`),'36.6.4');
-    assert.equal(await scalar(db,`select has_function_privilege('authenticated','public.import_catalog_request_atomic(text,bigint,bigint,integer,text,jsonb,jsonb,jsonb)','EXECUTE')`),false);
-    assert.equal(await scalar(db,`select has_function_privilege('authenticated','public.secure_import_catalog_request_atomic(uuid,text,bigint,bigint,integer,text,jsonb,jsonb,jsonb)','EXECUTE')`),true);
+    for(const [tableName,triggerName] of [
+      ['mo_orders','trg_mo_orders_contract_integrity'],
+      ['locked_studies','trg_locked_studies_contract_cancel_guard'],
+      ['mo_contracts','trg_mo_contracts_order_history_guard'],
+      ['request_lines','trg_request_lines_catalog_guard']
+    ]){
+      assert.equal(await scalar(db,`select exists(select 1 from pg_trigger t join pg_class c on c.oid=t.tgrelid join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relname=$1 and t.tgname=$2 and not t.tgisinternal and t.tgenabled<>'D')`,[tableName,triggerName]),true);
+    }
   }finally{await db.close();}
 });
 
@@ -118,5 +124,43 @@ test('κλειδωμένη μελέτη με ήδη καταχωρισμένη �
       /ανάθεση\/σύμβαση.*δεν μπορεί να ακυρωθεί/i
     );
     assert.equal(await scalar(db,`select record_status from public.locked_studies where id=$1`,[x.lock.study_id]),'active');
+  }finally{await db.close();}
+});
+
+test('μετά την έκδοση δελτίου δεν αλλάζει ο ανάδοχος ούτε στενεύουν οι ημερομηνίες της σύμβασης πάνω από το ιστορικό',async()=>{
+  const db=await install();
+  try{
+    const x=await prepareContract(db);
+    const issued=await scalar(db,`select public.save_order_atomic(null,$1,date '2026-08-15',$2,'Αποθήκη',null,24,$3::jsonb,true)`,[x.lock.study_id,String(x.receiverId),x.items]);
+    assert.equal(issued.status,'issued');
+
+    const supplier2=await scalar(db,`insert into public.mo_suppliers(name,created_by) values('Supplier 2',$1) returning id`,[ADMIN_ID]);
+    await assert.rejects(
+      db.query(`select public.save_contract_atomic($1,$2,$3,'Contract',null,null,date '2026-08-01',date '2026-08-31',24)`,[String(x.contract.contract_id),x.lock.study_id,String(supplier2)]),
+      /δεν αλλάζει ο προμηθευτής\/ανάδοχος/i
+    );
+    await assert.rejects(
+      db.query(`select public.save_contract_atomic($1,$2,$3,'Contract',null,null,date '2026-08-16',date '2026-08-31',24)`,[String(x.contract.contract_id),x.lock.study_id,String(x.supplierId)]),
+      /νέα έναρξη.*μεταγενέστερη/i
+    );
+    await assert.rejects(
+      db.query(`select public.save_contract_atomic($1,$2,$3,'Contract',null,null,date '2026-08-01',date '2026-08-14',24)`,[String(x.contract.contract_id),x.lock.study_id,String(x.supplierId)]),
+      /νέα λήξη.*προηγείται/i
+    );
+  }finally{await db.close();}
+});
+
+test('νέα γραμμή αιτήματος δεν μπορεί να χρησιμοποιήσει απενεργοποιημένο είδος καταλόγου',async()=>{
+  const db=await install();
+  try{
+    const unitId=await scalar(db,`select id from public.municipal_units where id<>11 order by id limit 1`);
+    const groupId=await scalar(db,`select id from public.procurement_groups where domain='procurement' order by id limit 1`);
+    const materialId=await scalar(db,`select id from public.materials where group_id=$1 and is_active order by id limit 1`,[groupId]);
+    const requestId=await scalar(db,`insert into public.unit_requests(municipal_unit_id,group_id,request_year,title,status,created_by,updated_by) values($1,$2,2026,'Inactive catalog test','draft',$3,$3) returning id`,[unitId,groupId,ADMIN_ID]);
+    await db.query(`update public.materials set is_active=false where id=$1`,[materialId]);
+    await assert.rejects(
+      db.query(`insert into public.request_lines(request_id,material_id,quantity,unit_price,comments,updated_by) values($1,$2,1,1,null,$3)`,[requestId,materialId,ADMIN_ID]),
+      /απαιτεί ενεργό είδος\/εργασία/i
+    );
   }finally{await db.close();}
 });
