@@ -1,0 +1,9 @@
+Third-party JavaScript included for deterministic local operation
+
+1. @supabase/supabase-js 2.112.0
+   Source: https://www.npmjs.com/package/@supabase/supabase-js/v/2.112.0
+   License: MIT (see licenses/supabase-js-LICENSE)
+
+2. ExcelJS 4.4.0
+   Source: https://www.npmjs.com/package/exceljs/v/4.4.0
+   License: MIT (see licenses/exceljs-LICENSE)
