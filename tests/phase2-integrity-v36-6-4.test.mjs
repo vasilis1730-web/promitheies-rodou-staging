@@ -63,10 +63,10 @@ async function activateGroups(db){
   `,[ADMIN_ID]);
 
   const groups=[
-    {group_no:1,name:'G1',municipal_unit_ids:[ids[0]]},
-    {group_no:2,name:'G2',municipal_unit_ids:ids.slice(1,4)},
-    {group_no:3,name:'G3',municipal_unit_ids:ids.slice(4,7)},
-    {group_no:4,name:'G4',municipal_unit_ids:ids.slice(7,10)}
+    {group_no:1,name:'Ρόδου',municipal_unit_ids:[ids[0]]},
+    {group_no:2,name:'Ιαλυσού – Καλλιθέας – Αφάντου',municipal_unit_ids:ids.slice(1,4)},
+    {group_no:3,name:'Λίνδου – Νότιας Ρόδου – Αρχαγγέλου',municipal_unit_ids:ids.slice(4,7)},
+    {group_no:4,name:'Πεταλουδών – Καμείρου – Ατταβύρου',municipal_unit_ids:ids.slice(7,10)}
   ];
   for(const group of groups){
     const awardGroupId=await scalar(db,`
