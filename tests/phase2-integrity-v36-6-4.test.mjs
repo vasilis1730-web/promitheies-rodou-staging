@@ -34,12 +34,12 @@ async function install(){
     values ('${ADMIN_ID}','admin',null,'Admin','admin@rhodes.gr',true),
            ('${UNIT_ID}','unit_user',1,'Unit','unit@rhodes.gr',true)
     on conflict(id) do nothing;
+    create or replace function auth.uid() returns uuid language sql stable as $$select '${ADMIN_ID}'::uuid$$;
   `);
   return db;
 }
 
 async function activateGroups(db){
-  await db.exec(`select set_config('app.uid','${ADMIN_ID}',false);`);
   const rows=await db.query(`select id from public.municipal_units where id<>11 order by id`);
   const ids=rows.rows.map(r=>Number(r.id));
   assert.equal(ids.length,10);
@@ -63,7 +63,7 @@ async function prepareContract(db){
   const contract=await scalar(db,`select public.save_contract_atomic(null,$1,$2,'Contract',null,null,date '2026-08-01',date '2026-08-31',24)`,[lock.study_id,supplierId]);
   const item=(await db.query(`select id,unit_price from public.mo_contract_items where contract_id=$1 order by id limit 1`,[contract.contract_id])).rows[0];
   const items=JSON.stringify([{contract_item_id:String(item.id),quantity:1,unit_price:Number(item.unit_price),description:'x',unit:'τεμ.'}]);
-  return {lock,receiverId,items};
+  return {lock,contract,supplierId,receiverId,items};
 }
 
 test('legacy import_catalog_request_atomic δεν είναι callable από authenticated ενώ το secure wrapper παραμένει API RPC',async()=>{
@@ -96,5 +96,17 @@ test('έκδοση δελτίου εκτός διάρκειας σύμβασης
     );
     const ok=await scalar(db,`select public.save_order_atomic(null,$1,date '2026-08-15',$2,'Αποθήκη',null,24,$3::jsonb,true)`,[x.lock.study_id,String(x.receiverId),x.items]);
     assert.equal(ok.status,'issued');
+  }finally{await db.close();}
+});
+
+test('κλειδωμένη μελέτη με ήδη καταχωρισμένη σύμβαση δεν μπορεί να ακυρωθεί',async()=>{
+  const db=await install();
+  try{
+    const x=await prepareContract(db);
+    await assert.rejects(
+      db.query(`select public.cancel_locked_study_atomic($1,'δοκιμή ακύρωσης')`,[x.lock.study_id]),
+      /ανάθεση\/σύμβαση.*δεν μπορεί να ακυρωθεί/i
+    );
+    assert.equal(await scalar(db,`select record_status from public.locked_studies where id=$1`,[x.lock.study_id]),'active');
   }finally{await db.close();}
 });
