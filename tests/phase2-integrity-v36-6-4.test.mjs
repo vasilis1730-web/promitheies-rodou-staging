@@ -43,8 +43,8 @@ async function install(){
     create or replace function public.app_current_unit_id() returns bigint language sql stable as $$select null::bigint$$;
     create or replace function public.app_is_admin() returns boolean language sql stable as $$select true$$;
     create or replace function public.app_can_supervise() returns boolean language sql stable as $$select true$$;
-    create or replace function public.app_can_read_unit(bigint) returns boolean language sql stable as $$select true$$;
-    create or replace function public.app_can_write_unit(bigint) returns boolean language sql stable as $$select true$$;
+    create or replace function public.app_can_read_unit(p_municipal_unit_id bigint) returns boolean language sql stable as $$select true$$;
+    create or replace function public.app_can_write_unit(p_municipal_unit_id bigint) returns boolean language sql stable as $$select true$$;
   `);
   return db;
 }
