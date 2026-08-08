@@ -1,0 +1,78 @@
+name: Align Phase2 memberships once
+
+on:
+  push:
+    branches:
+      - agent/v36-6-4-phase2-integrity
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/v36-6-4-phase2-integrity
+      - name: Patch canonical memberships
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('tests/phase2-integrity-v36-6-4.test.mjs')
+          s=p.read_text(encoding='utf-8')
+          replacement=r'''async function activateGroups(db){
+            const rows=await db.query(`
+              select id::bigint as id, public.app_rhodes_award_group_no(id::bigint)::int as group_no
+              from public.municipal_units
+              where id<>11
+              order by id
+            `);
+            assert.equal(rows.rows.length,10);
+            assert.ok(rows.rows.every(r=>Number(r.group_no)>=1 && Number(r.group_no)<=4));
+
+            const configId=await scalar(db,`
+              insert into public.award_group_configurations(
+                budget_year,decision_number,decision_date,decision_ada,direct_award_cap,
+                is_active,created_by,updated_by
+              ) values(2026,'1/2026',date '2026-08-01','TEST',30000,true,$1,$1)
+              returning id
+            `,[ADMIN_ID]);
+
+            const names={
+              1:'Ρόδου',
+              2:'Ιαλυσού – Καλλιθέας – Αφάντου',
+              3:'Λίνδου – Νότιας Ρόδου – Αρχαγγέλου',
+              4:'Πεταλουδών – Καμείρου – Ατταβύρου'
+            };
+            const groupIds={};
+            for(const groupNo of [1,2,3,4]){
+              groupIds[groupNo]=await scalar(db,`
+                insert into public.award_groups(configuration_id,group_no,name)
+                values($1,$2,$3) returning id
+              `,[configId,groupNo,names[groupNo]]);
+            }
+            for(const row of rows.rows){
+              const unitId=Number(row.id);
+              const groupNo=Number(row.group_no);
+              await db.query(`
+                insert into public.award_group_memberships(configuration_id,award_group_id,municipal_unit_id)
+                values($1,$2,$3)
+              `,[configId,groupIds[groupNo],unitId]);
+            }
+            return Number(rows.rows.find(r=>Number(r.group_no)===1).id);
+          }'''
+          pattern=r"async function activateGroups\(db\)\{.*?\n\}\n\nasync function prepareContract"
+          ns,count=re.subn(pattern,replacement+'\n\nasync function prepareContract',s,count=1,flags=re.S)
+          if count!=1:
+              raise SystemExit(f'Expected one activateGroups function, replaced {count}')
+          p.write_text(ns,encoding='utf-8')
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add tests/phase2-integrity-v36-6-4.test.mjs
+          git commit -m 'test: derive canonical Rhodes memberships'
+          git push origin HEAD:agent/v36-6-4-phase2-integrity
