@@ -1,0 +1,38 @@
+name: Generate package lock
+
+on:
+  push:
+    branches:
+      - agent/v36-6-3-production-readiness
+
+permissions:
+  contents: write
+
+jobs:
+  lock:
+    if: ${{ !contains(github.event.head_commit.message, 'Generate package-lock.json') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/v36-6-3-production-readiness
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Generate lockfile
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Commit lockfile
+        run: |
+          if git diff --quiet -- package-lock.json && git ls-files --error-unmatch package-lock.json >/dev/null 2>&1; then
+            echo 'package-lock.json already current.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package-lock.json
+          git commit -m 'Generate package-lock.json'
+          git push origin HEAD:agent/v36-6-3-production-readiness
