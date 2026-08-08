@@ -8,19 +8,14 @@
 -- 4. Κλειδωμένη μελέτη που έχει ήδη ανάθεση/σύμβαση δεν ακυρώνεται.
 -- 5. Διορθωτική μεταβολή σύμβασης δεν αλλοιώνει τον προμηθευτή ούτε
 --    αποκλείει ημερομηνίες ήδη εκδοθέντων δελτίων.
--- 6. Ενιαία έκδοση schema 36.6.4.
 --
+-- Η έκδοση schema αλλάζει μόνο στην ΤΕΛΕΥΤΑΙΑ migration της v36.6.4,
+-- ώστε μερική εφαρμογή του πακέτου να μην μπορεί να δηλώσει ψευδώς 36.6.4.
 -- Επαναλήψιμη. Δεν μεταβάλλει επιχειρησιακά δεδομένα.
 -- ============================================================================
 
 begin;
 
--- ---------------------------------------------------------------------------
--- P0: Η secure_import_catalog_request_atomic είναι το μοναδικό δημόσιο RPC
--- εισαγωγής Excel και απαιτεί administrator. Η παλαιότερη εσωτερική function
--- τροποποιεί τον κοινό κατάλογο και δεν πρέπει να είναι απευθείας καλέσιμη
--- από authenticated χρήστες.
--- ---------------------------------------------------------------------------
 do $$
 begin
   if to_regprocedure('public.import_catalog_request_atomic(text,bigint,bigint,integer,text,jsonb,jsonb,jsonb)') is not null then
@@ -29,11 +24,6 @@ begin
   end if;
 end $$;
 
--- ---------------------------------------------------------------------------
--- Lifecycle invariant: από τη στιγμή που υπάρχει ανάθεση/σύμβαση, η πηγή της
--- δεν μπορεί να χαρακτηριστεί «cancelled». Η πλήρης admin purge παραμένει
--- ξεχωριστή ελεγχόμενη διαδικασία και διαγράφει πρώτα τις εξαρτήσεις.
--- ---------------------------------------------------------------------------
 create or replace function public.app_study_contract_cancel_guard()
 returns trigger
 language plpgsql
@@ -63,11 +53,6 @@ create trigger trg_locked_studies_contract_cancel_guard
   before update of record_status on public.locked_studies
   for each row execute function public.app_study_contract_cancel_guard();
 
--- ---------------------------------------------------------------------------
--- Αν υπάρχουν ήδη εκδοθέντα/απεσταλμένα/παραληφθέντα δελτία, η διορθωτική
--- ενημέρωση της ανάθεσης δεν μπορεί να αλλάξει αντισυμβαλλόμενο ούτε να
--- μετακινήσει την περίοδο έτσι ώστε ιστορικό δελτίο να βρεθεί εκτός σύμβασης.
--- ---------------------------------------------------------------------------
 create or replace function public.app_contract_order_history_guard()
 returns trigger
 language plpgsql
@@ -123,10 +108,6 @@ create trigger trg_mo_contracts_order_history_guard
   before update of supplier_id, start_date, end_date on public.mo_contracts
   for each row execute function public.app_contract_order_history_guard();
 
--- ---------------------------------------------------------------------------
--- Οικονομική / χρονική ακεραιότητα δελτίου ως καθολικό DB invariant.
--- Δεν βασιζόμαστε στο frontend ούτε αποκλειστικά στη save_order_atomic.
--- ---------------------------------------------------------------------------
 create or replace function public.app_order_contract_integrity_guard()
 returns trigger
 language plpgsql
@@ -208,17 +189,5 @@ create trigger trg_mo_orders_contract_integrity
   before insert or update of contract_id, order_date, vat_rate, subtotal, vat, total, status
   on public.mo_orders
   for each row execute function public.app_order_contract_integrity_guard();
-
-create or replace function public.app_schema_version()
-returns text
-language sql
-stable
-set search_path = public, pg_temp
-as $$
-  select '36.6.4'::text
-$$;
-
-revoke all on function public.app_schema_version() from public, anon;
-grant execute on function public.app_schema_version() to authenticated;
 
 commit;
