@@ -1,8 +1,8 @@
 /*
  * PRODUCTION READINESS — v36.6.3
  *
- * Η δοκιμή ΔΕΝ διατηρεί χειροκίνητη λίστα migrations. Διαβάζει όλα τα .sql
- * από supabase/migrations ταξινομημένα, ώστε κάθε νέα migration να μπαίνει
+ * Δεν υπάρχει χειροκίνητη λίστα migrations: διαβάζονται όλα τα .sql από
+ * supabase/migrations ταξινομημένα, ώστε κάθε νέα migration να μπαίνει
  * αυτόματα στον clean-install έλεγχο.
  */
 import test from 'node:test';
@@ -14,7 +14,6 @@ import { PGlite } from '@electric-sql/pglite';
 
 const ADMIN_ID = '11111111-1111-1111-1111-111111111111';
 const migrationsDir = fileURLToPath(new URL('../supabase/migrations/', import.meta.url));
-const DIAGNOSTIC_MIGRATION = '202608070003_security_hardening.sql';
 
 function read(relative) {
   return fs.readFileSync(new URL(relative, import.meta.url), 'utf8');
@@ -32,42 +31,7 @@ async function scalar(db, sql, params = []) {
   return row[Object.keys(row)[0]];
 }
 
-async function migrationFailureDiagnostics(db) {
-  try { await db.exec('rollback'); } catch {}
-  const diagnostics = {};
-  try {
-    const fn = await db.query(`
-      select p.proname, p.prosecdef, p.proconfig, p.prosrc
-      from pg_proc p
-      join pg_namespace n on n.oid=p.pronamespace
-      where n.nspname='public' and p.proname='rls_auto_enable'
-    `);
-    diagnostics.rls_auto_enable = fn.rows;
-  } catch (error) {
-    diagnostics.rls_auto_enable_error = error?.message || String(error);
-  }
-  try {
-    const triggers = await db.query(`
-      select e.evtname, e.evtevent, e.evtenabled, e.evttags,
-             p.proname as function_name
-      from pg_event_trigger e
-      join pg_proc p on p.oid=e.evtfoid
-      order by e.evtname
-    `);
-    diagnostics.event_triggers = triggers.rows;
-  } catch (error) {
-    diagnostics.event_trigger_error = error?.message || String(error);
-  }
-  try {
-    diagnostics.rls_policy_templates = await scalar(db,
-      `select to_regclass('public.rls_policy_templates')::text`);
-  } catch (error) {
-    diagnostics.rls_policy_templates_error = error?.message || String(error);
-  }
-  return diagnostics;
-}
-
-async function installAll({ preHardeningDiagnostic = false } = {}) {
+async function installAll() {
   const db = new PGlite();
   await db.exec(`
     create role anon nologin;
@@ -90,23 +54,13 @@ async function installAll({ preHardeningDiagnostic = false } = {}) {
     .replace(/create extension if not exists pgcrypto;?/gi, ''));
 
   for (const name of allMigrationFiles()) {
-    if (preHardeningDiagnostic && name === DIAGNOSTIC_MIGRATION) {
-      const diagnostics = await migrationFailureDiagnostics(db);
-      console.error('PRE_70003_DIAGNOSTICS=' + JSON.stringify(diagnostics));
-      throw new Error(`PRE-70003 Diagnostics: ${JSON.stringify(diagnostics)}`);
-    }
-
     const sql = fs.readFileSync(path.join(migrationsDir, name), 'utf8')
       .replace(/create extension if not exists pgcrypto;?/gi, '');
     try {
       await db.exec(sql);
     } catch (error) {
-      const diagnostics = await migrationFailureDiagnostics(db);
-      console.error('FAILED_MIGRATION_DIAGNOSTICS=' + JSON.stringify({ migration: name, diagnostics }));
-      throw new Error(
-        `Migration ${name} failed: ${error?.message || error}\nDiagnostics: ${JSON.stringify(diagnostics)}`,
-        { cause: error }
-      );
+      try { await db.exec('rollback'); } catch {}
+      throw new Error(`Migration ${name} failed: ${error?.message || error}`, { cause: error });
     }
   }
 
@@ -121,13 +75,6 @@ async function installAll({ preHardeningDiagnostic = false } = {}) {
 
   return db;
 }
-
-test('diagnostic: καταγράφει το clean-install state ακριβώς πριν από 70003', async () => {
-  await assert.rejects(
-    () => installAll({ preHardeningDiagnostic: true }),
-    /PRE-70003 Diagnostics:/
-  );
-});
 
 test('clean install εφαρμόζει αυτόματα ΟΛΕΣ τις migrations και φτάνει σε schema 36.6.3', async () => {
   const db = await installAll();
