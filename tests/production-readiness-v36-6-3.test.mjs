@@ -92,6 +92,7 @@ async function installAll({ preHardeningDiagnostic = false } = {}) {
   for (const name of allMigrationFiles()) {
     if (preHardeningDiagnostic && name === DIAGNOSTIC_MIGRATION) {
       const diagnostics = await migrationFailureDiagnostics(db);
+      console.error('PRE_70003_DIAGNOSTICS=' + JSON.stringify(diagnostics));
       throw new Error(`PRE-70003 Diagnostics: ${JSON.stringify(diagnostics)}`);
     }
 
@@ -101,6 +102,7 @@ async function installAll({ preHardeningDiagnostic = false } = {}) {
       await db.exec(sql);
     } catch (error) {
       const diagnostics = await migrationFailureDiagnostics(db);
+      console.error('FAILED_MIGRATION_DIAGNOSTICS=' + JSON.stringify({ migration: name, diagnostics }));
       throw new Error(
         `Migration ${name} failed: ${error?.message || error}\nDiagnostics: ${JSON.stringify(diagnostics)}`,
         { cause: error }
