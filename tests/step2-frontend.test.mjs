@@ -36,9 +36,9 @@ const requiredRpcs = [
   'get_contract_balance_atomic'
 ];
 
-test('το frontend v36.6.1 χρησιμοποιεί διαχείριση μελετών, σταθερές ομάδες, ατομικές ροές και ασφαλή HTML sinks', () => {
-  assert.match(source, /Προμήθειες &amp; Υπηρεσίες v36\.6\.1 ORDER ISSUE HOTFIX/);
-  assert.match(source, /const APP_VERSION='v36\.6\.1-order-issue-hotfix', REQUIRED_SCHEMA_VERSION='36\.6\.1'/);
+test('το frontend v36.6.3 χρησιμοποιεί διαχείριση μελετών, σταθερές ομάδες, ατομικές ροές και ασφαλή HTML sinks', () => {
+  assert.match(source, /Προμήθειες &amp; Υπηρεσίες v36\.6\.3 PRODUCTION READINESS/);
+  assert.match(source, /const APP_VERSION='v36\.6\.3-production-readiness', REQUIRED_SCHEMA_VERSION='36\.6\.3'/);
   assert.match(source, /Ιαλυσού – Καλλιθέας – Αφάντου/);
   assert.match(source, /Λίνδου – Νότιας Ρόδου – Αρχαγγέλου/);
   assert.match(source, /Πεταλουδών – Καμείρου – Ατταβύρου/);

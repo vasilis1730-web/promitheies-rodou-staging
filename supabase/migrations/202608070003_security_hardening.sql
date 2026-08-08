@@ -8,6 +8,8 @@
 --  11 WARN   — συναρτήσεις με μεταβλητό search_path
 --
 -- Επαναλήψιμη. Δεν μεταβάλλει δεδομένα.
+-- ΣΗΜΑΝΤΙΚΟ: η rls_auto_enable() είναι προαιρετική helper function του
+-- περιβάλλοντος Supabase και δεν θεωρείται πλέον υποχρεωτικό repo object.
 -- ============================================================================
 
 begin;
@@ -25,28 +27,36 @@ end $$;
 
 -- ---------------------------------------------------------------------------
 -- 2. Συναρτήσεις trigger και εσωτερικά βοηθητικά δεν πρέπει να είναι
---    καλέσιμα μέσω /rest/v1/rpc/. Η rls_auto_enable ήταν εκτελέσιμη
---    ακόμη και χωρίς σύνδεση (ρόλος anon).
+--    καλέσιμα μέσω /rest/v1/rpc/.
 -- ---------------------------------------------------------------------------
 revoke all on function public.app_generic_audit_trigger() from public, anon, authenticated;
 revoke all on function public.set_updated_at()            from public, anon, authenticated;
-revoke all on function public.rls_auto_enable()           from public, anon, authenticated;
+
+-- Η rls_auto_enable() δεν δημιουργείται από το installer της εφαρμογής.
+-- Αν υπάρχει στο συγκεκριμένο Supabase project, θωρακίζεται. Αν δεν υπάρχει,
+-- η migration συνεχίζει κανονικά αντί να κάνει rollback ολόκληρο το hardening.
+do $$
+begin
+  if to_regprocedure('public.rls_auto_enable()') is not null then
+    revoke all on function public.rls_auto_enable() from public, anon, authenticated;
+    alter function public.rls_auto_enable() set search_path = public, pg_temp;
+  end if;
+end $$;
 
 -- ---------------------------------------------------------------------------
 -- 3. Καρφωμένο search_path, ώστε να μην είναι δυνατή παραπλάνηση μέσω
 --    ομώνυμων αντικειμένων σε άλλο schema.
 -- ---------------------------------------------------------------------------
-alter function public.set_updated_at()                          set search_path = public, pg_temp;
-alter function public.app_generic_audit_trigger()               set search_path = public, pg_temp;
-alter function public.rls_auto_enable()                         set search_path = public, pg_temp;
-alter function public.app_greek_key(text)                       set search_path = public, pg_temp;
-alter function public.app_unit_key(text)                        set search_path = public, pg_temp;
-alter function public.app_unit_default_scale(text)              set search_path = public, pg_temp;
+alter function public.set_updated_at()                              set search_path = public, pg_temp;
+alter function public.app_generic_audit_trigger()                   set search_path = public, pg_temp;
+alter function public.app_greek_key(text)                           set search_path = public, pg_temp;
+alter function public.app_unit_key(text)                            set search_path = public, pg_temp;
+alter function public.app_unit_default_scale(text)                  set search_path = public, pg_temp;
 alter function public.app_quantity_matches_scale(numeric, smallint) set search_path = public, pg_temp;
-alter function public.app_rhodes_award_group_no(bigint)         set search_path = public, pg_temp;
-alter function public.app_rhodes_award_group_no(text, text)     set search_path = public, pg_temp;
-alter function public.app_rhodes_award_group_name(integer)      set search_path = public, pg_temp;
-alter function public.app_rhodes_municipal_unit_code(text, text) set search_path = public, pg_temp;
+alter function public.app_rhodes_award_group_no(bigint)             set search_path = public, pg_temp;
+alter function public.app_rhodes_award_group_no(text, text)         set search_path = public, pg_temp;
+alter function public.app_rhodes_award_group_name(integer)          set search_path = public, pg_temp;
+alter function public.app_rhodes_municipal_unit_code(text, text)    set search_path = public, pg_temp;
 
 commit;
 
@@ -62,10 +72,10 @@ commit;
 --     πίνακες, μόνο SELECT.
 --
 --   • Οι πίνακες app_catalog_migrations, app_excel_import_tokens και
---     mo_order_number_counters έχουν RLS χωρίς policy. Αυτό σημαίνει
+--     mo_order_number_counters έχουν RLS χωρίς permissive policy. Αυτό σημαίνει
 --     «απαγόρευση σε όλους», που είναι το επιθυμητό: προσπελαύνονται
 --     αποκλειστικά μέσα από SECURITY DEFINER συναρτήσεις.
 --
---   • Η προστασία από διαρρευσμένους κωδικούς (HaveIBeenPwned) απαιτεί
---     πλάνο Pro και δεν ρυθμίζεται με SQL.
+--   • Η rls_auto_enable(), όταν υπάρχει, είναι περιβαλλοντικό hardening και
+--     όχι προαπαιτούμενο της εφαρμογής.
 -- ============================================================================

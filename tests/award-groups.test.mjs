@@ -105,7 +105,7 @@ async function openApp(configured) {
         from: table => queryBuilder(datasets, table),
         rpc: async (name,args) => {
           rpcCalls.push({name,args});
-          if(name === 'app_schema_version')return {data:'36.6.1',error:null};
+          if(name === 'app_schema_version')return {data:'36.6.3',error:null};
           if(name === 'secure_import_catalog_request_atomic')return {data:{request_id:'99',secure_import:true},error:null};
           if(name === 'issue_excel_export_token')return {data:{token:'11111111-1111-4111-8111-111111111111',expires_at:'2099-01-01T00:00:00Z'},error:null};
           return {data:1,error:null};
