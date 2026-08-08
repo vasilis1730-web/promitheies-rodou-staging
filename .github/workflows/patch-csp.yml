@@ -10,16 +10,13 @@ permissions:
 
 jobs:
   patch:
-    if: ${{ github.event.head_commit.message == 'chore: patch v36.6.3 csp hash' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout branch
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
         with:
           ref: agent/v36-6-3-production-readiness
 
-      - name: Refresh guarded CSP hash
-        shell: bash
+      - name: Patch CSP hash
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -27,19 +24,13 @@ jobs:
           s = p.read_text(encoding='utf-8')
           old = 'sha256-pQIp9F6QMXuSctnEGFgCeUJ207PIXdLe4Mo/t7S2E1o='
           new = 'sha256-bEDO0O5Tngmv1NuA/ODkoDNVsuof0+p8jtmo8bPlu8s='
-          count = s.count(old)
-          if count != 1:
-              raise SystemExit(f'Expected exactly one old CSP hash, found {count}')
+          if s.count(old) != 1:
+              raise SystemExit('Old CSP hash is not present exactly once')
           p.write_text(s.replace(old, new), encoding='utf-8')
           PY
 
-      - name: Commit exact CSP refresh
-        shell: bash
+      - name: Commit patch
         run: |
-          if git diff --quiet -- index.html; then
-            echo 'No CSP change detected'
-            exit 1
-          fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add index.html
