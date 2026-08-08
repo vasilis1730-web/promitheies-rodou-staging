@@ -7,6 +7,7 @@
 -- 3. Κλειδωμένη μελέτη που έχει ήδη ανάθεση/σύμβαση δεν ακυρώνεται.
 -- 4. Διορθωτική μεταβολή σύμβασης δεν αλλοιώνει τον προμηθευτή ούτε
 --    αποκλείει ημερομηνίες ήδη εκδοθέντων δελτίων.
+-- 5. Σύμβαση με εκδοθέν/απεσταλμένο ανοικτό δελτίο δεν απενεργοποιείται.
 --
 -- Η έκδοση schema αλλάζει μόνο στην ΤΕΛΕΥΤΑΙΑ migration της v36.6.4,
 -- ώστε μερική εφαρμογή του πακέτου να μην μπορεί να δηλώσει ψευδώς 36.6.4.
@@ -53,6 +54,19 @@ declare
   v_min_order_date date;
   v_max_order_date date;
 begin
+  if old.active is distinct from new.active
+     and new.active is false
+     and exists (
+       select 1
+       from public.mo_orders o
+       where o.contract_id = old.id
+         and o.status in ('issued', 'sent')
+     ) then
+    raise exception using
+      errcode = '55000',
+      message = 'Η σύμβαση έχει εκδοθέν ή απεσταλμένο ανοικτό δελτίο και δεν μπορεί να απενεργοποιηθεί πριν ολοκληρωθεί ή ακυρωθεί.';
+  end if;
+
   select min(o.order_date), max(o.order_date)
   into v_min_order_date, v_max_order_date
   from public.mo_orders o
@@ -96,7 +110,7 @@ revoke all on function public.app_contract_order_history_guard()
 
 drop trigger if exists trg_mo_contracts_order_history_guard on public.mo_contracts;
 create trigger trg_mo_contracts_order_history_guard
-  before update of supplier_id, start_date, end_date on public.mo_contracts
+  before update of supplier_id, start_date, end_date, active on public.mo_contracts
   for each row execute function public.app_contract_order_history_guard();
 
 create or replace function public.app_order_contract_integrity_guard()
