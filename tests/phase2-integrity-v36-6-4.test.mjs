@@ -53,13 +53,33 @@ async function activateGroups(db){
   const rows=await db.query(`select id from public.municipal_units where id<>11 order by id`);
   const ids=rows.rows.map(r=>Number(r.id));
   assert.equal(ids.length,10);
+
+  const configId=await scalar(db,`
+    insert into public.award_group_configurations(
+      budget_year,decision_number,decision_date,decision_ada,direct_award_cap,
+      is_active,created_by,updated_by
+    ) values(2026,'1/2026',date '2026-08-01','TEST',30000,true,$1,$1)
+    returning id
+  `,[ADMIN_ID]);
+
   const groups=[
     {group_no:1,name:'G1',municipal_unit_ids:[ids[0]]},
     {group_no:2,name:'G2',municipal_unit_ids:ids.slice(1,4)},
     {group_no:3,name:'G3',municipal_unit_ids:ids.slice(4,7)},
     {group_no:4,name:'G4',municipal_unit_ids:ids.slice(7,10)}
   ];
-  await db.query(`select public.save_award_group_configuration(2026,'1/2026',current_date,'TEST',30000,$1::jsonb)`,[JSON.stringify(groups)]);
+  for(const group of groups){
+    const awardGroupId=await scalar(db,`
+      insert into public.award_groups(configuration_id,group_no,name)
+      values($1,$2,$3) returning id
+    `,[configId,group.group_no,group.name]);
+    for(const unitId of group.municipal_unit_ids){
+      await db.query(`
+        insert into public.award_group_memberships(configuration_id,award_group_id,municipal_unit_id)
+        values($1,$2,$3)
+      `,[configId,awardGroupId,unitId]);
+    }
+  }
   return ids[0];
 }
 
