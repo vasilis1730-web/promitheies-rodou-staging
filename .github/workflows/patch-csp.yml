@@ -1,0 +1,45 @@
+name: Patch CSP hash once
+
+on:
+  push:
+    branches:
+      - agent/v36-6-3-production-readiness
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message == 'chore: patch v36.6.3 csp hash'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v6
+        with:
+          ref: agent/v36-6-3-production-readiness
+
+      - name: Refresh guarded CSP hash
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          old = 'sha256-pQIp9F6QMXuSctnEGFgCeUJ207PIXdLe4Mo/t7S2E1o='
+          new = 'sha256-bEDO0O5Tngmv1NuA/ODkoDNVsuof0+p8jtmo8bPlu8s='
+          count = s.count(old)
+          if count != 1:
+              raise SystemExit(f'Expected exactly one old CSP hash, found {count}')
+          p.write_text(s.replace(old, new), encoding='utf-8')
+
+      - name: Commit exact CSP refresh
+        shell: bash
+        run: |
+          if git diff --quiet -- index.html; then
+            echo 'No CSP change detected'
+            exit 1
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git commit -m 'fix: refresh CSP hash for v36.6.3'
+          git push origin HEAD:agent/v36-6-3-production-readiness
