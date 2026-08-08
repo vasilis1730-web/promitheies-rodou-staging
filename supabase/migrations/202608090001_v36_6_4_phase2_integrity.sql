@@ -1,12 +1,11 @@
 -- ============================================================================
 -- ΔΗΜΟΣ ΡΟΔΟΥ — v36.6.4 PHASE 2 INTEGRITY
 --
--- 1. Κλείνει το legacy Excel-import authorization bypass.
--- 2. Δελτίο: ο ΦΠΑ πρέπει να συμφωνεί με τη σύμβαση.
--- 3. Εκδοθέν/απεσταλμένο/παραληφθέν δελτίο πρέπει να βρίσκεται εντός
+-- 1. Δελτίο: ο ΦΠΑ πρέπει να συμφωνεί με τη σύμβαση.
+-- 2. Εκδοθέν/απεσταλμένο/παραληφθέν δελτίο πρέπει να βρίσκεται εντός
 --    της χρονικής διάρκειας της σύμβασης, όταν έχουν οριστεί ημερομηνίες.
--- 4. Κλειδωμένη μελέτη που έχει ήδη ανάθεση/σύμβαση δεν ακυρώνεται.
--- 5. Διορθωτική μεταβολή σύμβασης δεν αλλοιώνει τον προμηθευτή ούτε
+-- 3. Κλειδωμένη μελέτη που έχει ήδη ανάθεση/σύμβαση δεν ακυρώνεται.
+-- 4. Διορθωτική μεταβολή σύμβασης δεν αλλοιώνει τον προμηθευτή ούτε
 --    αποκλείει ημερομηνίες ήδη εκδοθέντων δελτίων.
 --
 -- Η έκδοση schema αλλάζει μόνο στην ΤΕΛΕΥΤΑΙΑ migration της v36.6.4,
@@ -15,14 +14,6 @@
 -- ============================================================================
 
 begin;
-
-do $$
-begin
-  if to_regprocedure('public.import_catalog_request_atomic(text,bigint,bigint,integer,text,jsonb,jsonb,jsonb)') is not null then
-    revoke all on function public.import_catalog_request_atomic(text,bigint,bigint,integer,text,jsonb,jsonb,jsonb)
-      from public, anon, authenticated;
-  end if;
-end $$;
 
 create or replace function public.app_study_contract_cancel_guard()
 returns trigger
