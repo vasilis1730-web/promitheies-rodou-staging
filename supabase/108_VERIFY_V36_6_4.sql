@@ -15,7 +15,15 @@ rpc_checks as (
       limit 1
     ),false) as legacy_import_catalog_admin_guard_present,
     to_regprocedure('public.secure_import_catalog_request_atomic(uuid,text,bigint,bigint,integer,text,jsonb,jsonb,jsonb)') is not null
-      as secure_import_rpc_exists
+      as secure_import_rpc_exists,
+    coalesce((
+      select position('is_active' in lower(p.prosrc)) > 0
+      from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+      where n.nspname='public'
+        and p.proname='app_validate_request_lines'
+        and pg_get_function_identity_arguments(p.oid)='bigint, jsonb'
+      limit 1
+    ),false) as request_validator_checks_active_catalog_item
 ),
 triggers as (
   select
@@ -95,6 +103,7 @@ select jsonb_pretty(jsonb_build_object(
     'schema_version','36.6.4',
     'legacy_import_catalog_admin_guard_present',true,
     'secure_import_rpc_exists',true,
+    'request_validator_checks_active_catalog_item',true,
     'all_four_integrity_triggers',true,
     'all_violation_counts',0,
     'procurement_missing_specs',0,
