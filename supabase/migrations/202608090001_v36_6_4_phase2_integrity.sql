@@ -5,7 +5,8 @@
 -- 2. Δελτίο: ο ΦΠΑ πρέπει να συμφωνεί με τη σύμβαση.
 -- 3. Εκδοθέν/απεσταλμένο/παραληφθέν δελτίο πρέπει να βρίσκεται εντός
 --    της χρονικής διάρκειας της σύμβασης, όταν έχουν οριστεί ημερομηνίες.
--- 4. Ενιαία έκδοση schema 36.6.4.
+-- 4. Κλειδωμένη μελέτη που έχει ήδη ανάθεση/σύμβαση δεν ακυρώνεται.
+-- 5. Ενιαία έκδοση schema 36.6.4.
 --
 -- Επαναλήψιμη. Δεν μεταβάλλει επιχειρησιακά δεδομένα.
 -- ============================================================================
@@ -25,6 +26,40 @@ begin
       from public, anon, authenticated;
   end if;
 end $$;
+
+-- ---------------------------------------------------------------------------
+-- Lifecycle invariant: από τη στιγμή που υπάρχει ανάθεση/σύμβαση, η πηγή της
+-- δεν μπορεί να χαρακτηριστεί «cancelled». Η πλήρης admin purge παραμένει
+-- ξεχωριστή ελεγχόμενη διαδικασία και διαγράφει πρώτα τις εξαρτήσεις.
+-- ---------------------------------------------------------------------------
+create or replace function public.app_study_contract_cancel_guard()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  if old.record_status = 'active'
+     and new.record_status = 'cancelled'
+     and exists (
+       select 1
+       from public.mo_contracts c
+       where c.source_study_id = old.id
+     ) then
+    raise exception using
+      errcode = '55000',
+      message = 'Η κλειδωμένη μελέτη έχει ήδη ανάθεση/σύμβαση και δεν μπορεί να ακυρωθεί. Απαιτείται πρώτα η προβλεπόμενη διαχείριση της σύμβασης.';
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.app_study_contract_cancel_guard()
+  from public, anon, authenticated;
+
+drop trigger if exists trg_locked_studies_contract_cancel_guard on public.locked_studies;
+create trigger trg_locked_studies_contract_cancel_guard
+  before update of record_status on public.locked_studies
+  for each row execute function public.app_study_contract_cancel_guard();
 
 -- ---------------------------------------------------------------------------
 -- Οικονομική / χρονική ακεραιότητα δελτίου ως καθολικό DB invariant.
