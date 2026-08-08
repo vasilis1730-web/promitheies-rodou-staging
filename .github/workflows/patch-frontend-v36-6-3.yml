@@ -1,0 +1,51 @@
+name: Patch frontend v36.6.3
+
+on:
+  push:
+    branches:
+      - agent/v36-6-3-production-readiness
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, 'Apply frontend v36.6.3 patch') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/v36-6-3-production-readiness
+          fetch-depth: 0
+
+      - name: Patch index.html safely
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          replacements = [
+              ('v36.6.1 ORDER ISSUE HOTFIX', 'v36.6.3 PRODUCTION READINESS'),
+              ("const APP_VERSION='v36.6.1-order-issue-hotfix', REQUIRED_SCHEMA_VERSION='36.6.1';",
+               "const APP_VERSION='v36.6.3-production-readiness', REQUIRED_SCHEMA_VERSION='36.6.3';"),
+              ("'v36.6.1-order-issue-hotfix']);",
+               "'v36.6.1-order-issue-hotfix','v36.6.3-production-readiness']);"),
+          ]
+          for old, new in replacements:
+              count = s.count(old)
+              if count != 1:
+                  raise SystemExit(f'Expected exactly one match for {old!r}, found {count}')
+              s = s.replace(old, new, 1)
+          p.write_text(s, encoding='utf-8')
+
+      - name: Commit frontend patch
+        run: |
+          if git diff --quiet -- index.html; then
+            echo 'No frontend changes required.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git commit -m 'Apply frontend v36.6.3 patch'
+          git push origin HEAD:agent/v36-6-3-production-readiness
