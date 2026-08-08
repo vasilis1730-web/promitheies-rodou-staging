@@ -56,7 +56,11 @@ async function installAll() {
   for (const name of allMigrationFiles()) {
     const sql = fs.readFileSync(path.join(migrationsDir, name), 'utf8')
       .replace(/create extension if not exists pgcrypto;?/gi, '');
-    await db.exec(sql);
+    try {
+      await db.exec(sql);
+    } catch (error) {
+      throw new Error(`Migration ${name} failed: ${error?.message || error}`, { cause: error });
+    }
   }
 
   await db.exec(`
