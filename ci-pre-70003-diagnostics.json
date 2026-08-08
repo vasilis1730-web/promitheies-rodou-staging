@@ -1,0 +1,93 @@
+{
+  "generated_at": "2026-08-08T09:37:06.767Z",
+  "setup": [
+    "installer",
+    "202608040001_award_groups.sql",
+    "202608050002_rls_immutable_audit.sql",
+    "202608050003_atomic_workflows.sql",
+    "202608050004_quantity_units_balances.sql",
+    "202608050005_xss_safe_excel.sql",
+    "202608050006_fixed_rhodes_award_groups.sql",
+    "202608050007_service_catalog.sql",
+    "202608050008_fix_save_request_status.sql",
+    "202608060001_fix_atavyros_unit_name.sql",
+    "202608060002_fix_south_rhodes_unit_name.sql",
+    "202608060003_fix_mo_orders_study_column.sql",
+    "202608060004_admin_study_templates_and_purge.sql",
+    "202608070001_fix_order_issue_and_purge_audit.sql",
+    "202608070002_technical_specs_transfer.sql"
+  ],
+  "state": {
+    "rls_auto_enable": [],
+    "functions_referencing_rls_policy_templates": [],
+    "event_triggers": [],
+    "rls_policy_templates": [
+      {
+        "relation": null
+      }
+    ],
+    "v_specs_coverage": [
+      {
+        "relation": "v_specs_coverage"
+      }
+    ]
+  },
+  "statements": [
+    {
+      "label": "alter v_specs_coverage security_invoker",
+      "ok": true
+    },
+    {
+      "label": "revoke app_generic_audit_trigger",
+      "ok": true
+    },
+    {
+      "label": "revoke set_updated_at",
+      "ok": true
+    },
+    {
+      "label": "conditional rls_auto_enable hardening",
+      "ok": true
+    },
+    {
+      "label": "alter function public.set_updated_at() set search_path = public, pg_temp",
+      "ok": true
+    },
+    {
+      "label": "alter function public.app_generic_audit_trigger() set search_path = public, pg_temp",
+      "ok": true
+    },
+    {
+      "label": "alter function public.app_greek_key(text) set search_path = public, pg_temp",
+      "ok": true
+    },
+    {
+      "label": "alter function public.app_unit_key(text) set search_path = public, pg_temp",
+      "ok": true
+    },
+    {
+      "label": "alter function public.app_unit_default_scale(text) set search_path = public, pg_temp",
+      "ok": true
+    },
+    {
+      "label": "alter function public.app_quantity_matches_scale(numeric, smallint) set search_path = public, pg_temp",
+      "ok": true
+    },
+    {
+      "label": "alter function public.app_rhodes_award_group_no(bigint) set search_path = public, pg_temp",
+      "ok": true
+    },
+    {
+      "label": "alter function public.app_rhodes_award_group_no(text, text) set search_path = public, pg_temp",
+      "ok": true
+    },
+    {
+      "label": "alter function public.app_rhodes_award_group_name(integer) set search_path = public, pg_temp",
+      "ok": true
+    },
+    {
+      "label": "alter function public.app_rhodes_municipal_unit_code(text, text) set search_path = public, pg_temp",
+      "ok": true
+    }
+  ]
+}
