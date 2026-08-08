@@ -31,6 +31,41 @@ async function scalar(db, sql, params = []) {
   return row[Object.keys(row)[0]];
 }
 
+async function migrationFailureDiagnostics(db) {
+  try { await db.exec('rollback'); } catch {}
+  const diagnostics = {};
+  try {
+    const fn = await db.query(`
+      select p.proname, p.prosecdef, p.proconfig, p.prosrc
+      from pg_proc p
+      join pg_namespace n on n.oid=p.pronamespace
+      where n.nspname='public' and p.proname='rls_auto_enable'
+    `);
+    diagnostics.rls_auto_enable = fn.rows;
+  } catch (error) {
+    diagnostics.rls_auto_enable_error = error?.message || String(error);
+  }
+  try {
+    const triggers = await db.query(`
+      select e.evtname, e.evtevent, e.evtenabled, e.evttags,
+             p.proname as function_name
+      from pg_event_trigger e
+      join pg_proc p on p.oid=e.evtfoid
+      order by e.evtname
+    `);
+    diagnostics.event_triggers = triggers.rows;
+  } catch (error) {
+    diagnostics.event_trigger_error = error?.message || String(error);
+  }
+  try {
+    diagnostics.rls_policy_templates = await scalar(db,
+      `select to_regclass('public.rls_policy_templates')::text`);
+  } catch (error) {
+    diagnostics.rls_policy_templates_error = error?.message || String(error);
+  }
+  return diagnostics;
+}
+
 async function installAll() {
   const db = new PGlite();
   await db.exec(`
@@ -59,7 +94,11 @@ async function installAll() {
     try {
       await db.exec(sql);
     } catch (error) {
-      throw new Error(`Migration ${name} failed: ${error?.message || error}`, { cause: error });
+      const diagnostics = await migrationFailureDiagnostics(db);
+      throw new Error(
+        `Migration ${name} failed: ${error?.message || error}\nDiagnostics: ${JSON.stringify(diagnostics)}`,
+        { cause: error }
+      );
     }
   }
 
