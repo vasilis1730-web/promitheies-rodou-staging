@@ -85,7 +85,7 @@ async function openApp() {
           updateUser: async () => ({ error: null })
         },
         from: table => queryBuilder(datasets, table),
-        rpc: async name => name === 'app_schema_version' ? { data: '36.6.1', error: null } : { data: 1, error: null }
+        rpc: async name => name === 'app_schema_version' ? { data: '36.6.3', error: null } : { data: 1, error: null }
       }) };
       window.ExcelJS = ExcelJS;
       window.ResizeObserver = class { observe() {} disconnect() {} };
