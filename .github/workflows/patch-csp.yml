@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   patch:
-    if: github.event.head_commit.message == 'chore: patch v36.6.3 csp hash'
+    if: ${{ github.event.head_commit.message == 'chore: patch v36.6.3 csp hash' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout branch
@@ -19,8 +19,9 @@ jobs:
           ref: agent/v36-6-3-production-readiness
 
       - name: Refresh guarded CSP hash
-        shell: python
+        shell: bash
         run: |
+          python - <<'PY'
           from pathlib import Path
           p = Path('index.html')
           s = p.read_text(encoding='utf-8')
@@ -30,6 +31,7 @@ jobs:
           if count != 1:
               raise SystemExit(f'Expected exactly one old CSP hash, found {count}')
           p.write_text(s.replace(old, new), encoding='utf-8')
+          PY
 
       - name: Commit exact CSP refresh
         shell: bash
