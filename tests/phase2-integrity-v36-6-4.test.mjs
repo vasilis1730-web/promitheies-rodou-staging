@@ -50,9 +50,14 @@ async function install(){
 }
 
 async function activateGroups(db){
-  const rows=await db.query(`select id from public.municipal_units where id<>11 order by id`);
-  const ids=rows.rows.map(r=>Number(r.id));
-  assert.equal(ids.length,10);
+  const rows=await db.query(`
+    select id::bigint as id, public.app_rhodes_award_group_no(id::bigint)::int as group_no
+    from public.municipal_units
+    where id<>11
+    order by id
+  `);
+  assert.equal(rows.rows.length,10);
+  assert.ok(rows.rows.every(r=>Number(r.group_no)>=1 && Number(r.group_no)<=4));
 
   const configId=await scalar(db,`
     insert into public.award_group_configurations(
@@ -62,25 +67,28 @@ async function activateGroups(db){
     returning id
   `,[ADMIN_ID]);
 
-  const groups=[
-    {group_no:1,name:'Ρόδου',municipal_unit_ids:[ids[0]]},
-    {group_no:2,name:'Ιαλυσού – Καλλιθέας – Αφάντου',municipal_unit_ids:ids.slice(1,4)},
-    {group_no:3,name:'Λίνδου – Νότιας Ρόδου – Αρχαγγέλου',municipal_unit_ids:ids.slice(4,7)},
-    {group_no:4,name:'Πεταλουδών – Καμείρου – Ατταβύρου',municipal_unit_ids:ids.slice(7,10)}
-  ];
-  for(const group of groups){
-    const awardGroupId=await scalar(db,`
+  const names={
+    1:'Ρόδου',
+    2:'Ιαλυσού – Καλλιθέας – Αφάντου',
+    3:'Λίνδου – Νότιας Ρόδου – Αρχαγγέλου',
+    4:'Πεταλουδών – Καμείρου – Ατταβύρου'
+  };
+  const groupIds={};
+  for(const groupNo of [1,2,3,4]){
+    groupIds[groupNo]=await scalar(db,`
       insert into public.award_groups(configuration_id,group_no,name)
       values($1,$2,$3) returning id
-    `,[configId,group.group_no,group.name]);
-    for(const unitId of group.municipal_unit_ids){
-      await db.query(`
-        insert into public.award_group_memberships(configuration_id,award_group_id,municipal_unit_id)
-        values($1,$2,$3)
-      `,[configId,awardGroupId,unitId]);
-    }
+    `,[configId,groupNo,names[groupNo]]);
   }
-  return ids[0];
+  for(const row of rows.rows){
+    const unitId=Number(row.id);
+    const groupNo=Number(row.group_no);
+    await db.query(`
+      insert into public.award_group_memberships(configuration_id,award_group_id,municipal_unit_id)
+      values($1,$2,$3)
+    `,[configId,groupIds[groupNo],unitId]);
+  }
+  return Number(rows.rows.find(r=>Number(r.group_no)===1).id);
 }
 
 async function prepareContract(db){
