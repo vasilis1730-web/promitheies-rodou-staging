@@ -127,7 +127,7 @@ test('κλειδωμένη μελέτη με ήδη καταχωρισμένη �
   }finally{await db.close();}
 });
 
-test('μετά την έκδοση δελτίου δεν αλλάζει ο ανάδοχος ούτε στενεύουν οι ημερομηνίες της σύμβασης πάνω από το ιστορικό',async()=>{
+test('μετά την έκδοση δελτίου δεν αλλάζει ο ανάδοχος, δεν στενεύουν οι ημερομηνίες και δεν απενεργοποιείται ανοικτή σύμβαση',async()=>{
   const db=await install();
   try{
     const x=await prepareContract(db);
@@ -147,6 +147,11 @@ test('μετά την έκδοση δελτίου δεν αλλάζει ο αν�
       db.query(`select public.save_contract_atomic($1,$2,$3,'Contract',null,null,date '2026-08-01',date '2026-08-14',24)`,[String(x.contract.contract_id),x.lock.study_id,String(x.supplierId)]),
       /νέα λήξη.*προηγείται/i
     );
+    await assert.rejects(
+      db.query(`update public.mo_contracts set active=false where id=$1`,[String(x.contract.contract_id)]),
+      /ανοικτό δελτίο.*δεν μπορεί να απενεργοποιηθεί/i
+    );
+    assert.equal(await scalar(db,`select active from public.mo_contracts where id=$1`,[String(x.contract.contract_id)]),true);
   }finally{await db.close();}
 });
 
