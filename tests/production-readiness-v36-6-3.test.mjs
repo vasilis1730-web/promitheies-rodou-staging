@@ -83,7 +83,9 @@ test('clean install εφαρμόζει αυτόματα ΟΛΕΣ τις migratio
     assert.ok(migrations.includes('202608070002_technical_specs_transfer.sql'));
     assert.ok(migrations.includes('202608070003_security_hardening.sql'));
     assert.ok(migrations.includes('202608080001_v36_6_3_authorization_readiness.sql'));
+    assert.ok(migrations.includes('202608090000_v36_6_4_integrity_preflight.sql'));
     assert.ok(migrations.includes('202608090001_v36_6_4_phase2_integrity.sql'));
+    assert.ok(migrations.includes('202608090002_v36_6_4_request_line_integrity_and_version.sql'));
 
     assert.equal(await scalar(db, `select public.app_schema_version()`), '36.6.4');
     assert.equal(await scalar(db,
