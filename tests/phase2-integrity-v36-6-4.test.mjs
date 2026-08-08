@@ -34,12 +34,12 @@ async function install(){
     values ('${ADMIN_ID}','admin',null,'Admin','admin@rhodes.gr',true),
            ('${UNIT_ID}','unit_user',1,'Unit','unit@rhodes.gr',true)
     on conflict(id) do nothing;
-    select set_config('app.uid','${ADMIN_ID}',false);
   `);
   return db;
 }
 
 async function activateGroups(db){
+  await db.exec(`select set_config('app.uid','${ADMIN_ID}',false);`);
   const rows=await db.query(`select id from public.municipal_units where id<>11 order by id`);
   const ids=rows.rows.map(r=>Number(r.id));
   assert.equal(ids.length,10);
