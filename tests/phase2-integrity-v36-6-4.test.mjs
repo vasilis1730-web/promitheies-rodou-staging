@@ -34,7 +34,17 @@ async function install(){
     values ('${ADMIN_ID}','admin',null,'Admin','admin@rhodes.gr',true),
            ('${UNIT_ID}','unit_user',1,'Unit','unit@rhodes.gr',true)
     on conflict(id) do nothing;
+
+    -- PGlite-only deterministic Supabase auth context for these workflow tests.
+    -- Production authorization helpers are tested separately in production-readiness.
     create or replace function auth.uid() returns uuid language sql stable as $$select '${ADMIN_ID}'::uuid$$;
+    create or replace function public.app_user_is_active() returns boolean language sql stable as $$select true$$;
+    create or replace function public.app_current_role() returns text language sql stable as $$select 'admin'::text$$;
+    create or replace function public.app_current_unit_id() returns bigint language sql stable as $$select null::bigint$$;
+    create or replace function public.app_is_admin() returns boolean language sql stable as $$select true$$;
+    create or replace function public.app_can_supervise() returns boolean language sql stable as $$select true$$;
+    create or replace function public.app_can_read_unit(bigint) returns boolean language sql stable as $$select true$$;
+    create or replace function public.app_can_write_unit(bigint) returns boolean language sql stable as $$select true$$;
   `);
   return db;
 }
