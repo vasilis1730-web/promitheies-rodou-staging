@@ -189,3 +189,17 @@ test('νέα γραμμή αιτήματος δεν μπορεί να χρησι
     );
   }finally{await db.close();}
 });
+
+test('ανενεργό είδος δεν μπορεί να περάσει στο κλείδωμα νέας μελέτης',async()=>{
+  const db=await install();
+  try{
+    const unitId=await activateGroups(db);
+    const groupId=await scalar(db,`select id from public.procurement_groups where domain='procurement' order by id limit 1`);
+    const materialId=await scalar(db,`select id from public.materials where group_id=$1 and is_active order by id limit 1`,[groupId]);
+    await db.query(`update public.materials set is_active=false where id=$1`,[materialId]);
+    await assert.rejects(
+      db.query(`select public.lock_study_atomic(null,$1,$2,2026,'Inactive lock test',null,null,jsonb_build_array(jsonb_build_object('material_id',$3::text,'quantity',1,'unit_price',1,'comments',null)))`,[unitId,groupId,materialId]),
+      /ανενεργό/i
+    );
+  }finally{await db.close();}
+});
