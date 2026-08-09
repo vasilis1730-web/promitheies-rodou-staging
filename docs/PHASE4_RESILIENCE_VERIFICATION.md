@@ -38,6 +38,8 @@
 
 Τα browser/JSDOM fixtures που προσομοιώνουν Supabase δηλώνουν πλέον schema **36.6.6** και περιμένουν τις resilient critical RPCs. Τα ιστορικά deployment-point tests εξακολουθούν να σταματούν ρητά στην έκδοση που ελέγχουν και δεν μετατρέπονται τεχνητά σε tests της τρέχουσας έκδοσης.
 
+Το title, το `APP_VERSION`, το `REQUIRED_SCHEMA_VERSION`, η συμβατότητα Excel και το ορατό footer της εφαρμογής είναι όλα ευθυγραμμισμένα στην **v36.6.6 PRODUCTION RESILIENCE**.
+
 ## Backup / recovery
 
 Η τεχνική διαδικασία περιγράφεται στο `docs/PHASE4_DISASTER_RECOVERY.md`. Η εφαρμογή δεν αποθηκεύει database dumps ή credentials στο GitHub repository.
