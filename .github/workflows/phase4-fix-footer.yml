@@ -1,0 +1,37 @@
+name: Align Phase4 footer
+on:
+  push:
+    branches: [agent/v36-6-6-resilience]
+permissions:
+  contents: write
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/v36-6-6-resilience
+          fetch-depth: 0
+      - name: Update footer version and CSP unaffected
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('index.html');s=p.read_text(encoding='utf-8')
+          old='developer Vasilis Diakolios · v36.6.5 CONTRACT PRICING'
+          new='developer Vasilis Diakolios · v36.6.6 PRODUCTION RESILIENCE'
+          if s.count(old)!=1: raise SystemExit('footer version anchor missing')
+          p.write_text(s.replace(old,new,1),encoding='utf-8')
+          PY
+      - name: Commit footer
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add index.html
+          git commit -m "fix: align footer with v36.6.6"
+          git push origin HEAD:agent/v36-6-6-resilience
+      - name: Remove temporary workflow
+        run: |
+          git rm .github/workflows/phase4-fix-footer.yml
+          git commit -m "chore: remove Phase4 footer helper"
+          git push origin HEAD:agent/v36-6-6-resilience
