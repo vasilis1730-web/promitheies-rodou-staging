@@ -34,7 +34,7 @@ test('ο τοπικός server σερβίρει την εφαρμογή και �
   assert.equal(response.status, 200);
   assert.match(response.headers.get('content-type') || '', /^text\/html/);
   const html = await response.text();
-  assert.match(html, /v36\.6\.5 CONTRACT PRICING/);
+  assert.match(html, /v36\.6\.6 PRODUCTION RESILIENCE/);
   assert.match(html, /omncqldgtkdcjpqfwwlr\.supabase\.co/);
 
   const vendorResponse = await fetch(`http://127.0.0.1:${port}/vendor/supabase.js`, { method: 'HEAD' });
