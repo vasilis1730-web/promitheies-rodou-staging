@@ -39,7 +39,7 @@ set estimated_unit_price = coalesce(estimated_unit_price,unit_price,0)
 where estimated_unit_price is null;
 
 alter table public.mo_contracts
-  alter column estimated_amount set default 0,
+  alter column estimated_amount drop default,
   alter column estimated_amount set not null,
   alter column pricing_mode set default 'study',
   alter column pricing_mode set not null,
@@ -47,7 +47,7 @@ alter table public.mo_contracts
   alter column discount_pct set not null;
 
 alter table public.mo_contract_items
-  alter column estimated_unit_price set default 0,
+  alter column estimated_unit_price drop default,
   alter column estimated_unit_price set not null;
 
 do $$
