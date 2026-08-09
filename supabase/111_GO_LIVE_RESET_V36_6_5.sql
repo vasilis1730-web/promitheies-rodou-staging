@@ -116,18 +116,22 @@ $$;
 -- ---------------------------------------------------------------------------
 -- 3. Οριστικά metadata Απόφασης Δημοτικού Συμβουλίου
 -- ---------------------------------------------------------------------------
-update public.award_group_configurations
-set decision_number='195/2026',
-    decision_date=date '2026-07-21',
-    decision_ada='9ΒΜΣΩ1Ρ-ΣΝ3',
-    direct_award_cap=30000.00,
-    is_active=true,
-    updated_at=now()
-where budget_year=2026;
+do $decision$
+begin
+  update public.award_group_configurations
+  set decision_number='195/2026',
+      decision_date=date '2026-07-21',
+      decision_ada='9ΒΜΣΩ1Ρ-ΣΝ3',
+      direct_award_cap=30000.00,
+      is_active=true,
+      updated_at=now()
+  where budget_year=2026;
 
-if not found then
-  raise exception 'Δεν ενημερώθηκε η παραμετροποίηση ομάδων για το 2026.';
-end if;
+  if not found then
+    raise exception 'Δεν ενημερώθηκε η παραμετροποίηση ομάδων για το 2026.';
+  end if;
+end;
+$decision$;
 
 -- ---------------------------------------------------------------------------
 -- 4. Πλήρης καθαρισμός ΟΛΩΝ των δοκιμαστικών επιχειρησιακών δεδομένων.
@@ -170,7 +174,6 @@ declare
   v_nonzero text[] := array[]::text[];
   v_count bigint;
   v_materials bigint;
-  v_service_items bigint;
   v_users bigint;
   v_groups bigint;
   v_members bigint;
@@ -217,9 +220,6 @@ begin
 
   -- Master-data safety checks: οι κατάλογοι και η πρόσβαση πρέπει να έχουν μείνει.
   select count(*) into v_materials from public.materials where is_active is true;
-  select count(*) into v_service_items
-  from public.materials m join public.procurement_groups g on g.id=m.group_id
-  where m.is_active is true and g.domain='service';
   select count(*) into v_users from public.profiles where is_active is true;
   select count(*) into v_groups
   from public.award_groups g join public.award_group_configurations c on c.id=g.configuration_id
