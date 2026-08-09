@@ -69,7 +69,7 @@ async function prepareStudy(db,{qty=10,price=5}={}){
 }
 
 async function savePricingContract(db,x,{mode='study',discount=0,itemPrices=null,contractId=null}={}){
-  return scalar(db,`select public.save_contract_pricing_atomic($1,$2,$3,'Contract',null,null,date '2026-08-01',date '2026-08-31',24,$4,$5,$6::jsonb)`,[
+  return scalar(db,`select public.save_contract_pricing_atomic($1::text,$2::text,$3::text,'Contract',null,null,date '2026-08-01',date '2026-08-31',24,$4::text,$5::numeric,$6::jsonb)`,[
     contractId==null?null:String(contractId),x.lock.study_id,String(x.supplierId),mode,discount,itemPrices==null?null:JSON.stringify(itemPrices)
   ]);
 }
