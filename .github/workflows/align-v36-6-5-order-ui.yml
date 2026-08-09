@@ -34,13 +34,13 @@ jobs:
             if s.count(old)!=1:
               raise SystemExit(f'expected one occurrence, found {s.count(old)}: {old[:90]}')
             s=s.replace(old,new)
-          inline=[m.group(1) for m in re.finditer(r'<script(?![^>]*\\bsrc=)[^>]*>([\\s\\S]*?)</script>',s,re.I)]
+          inline=[m.group(1) for m in re.finditer(r'<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)</script>',s,re.I)]
           if len(inline)!=2: raise SystemExit(f'expected 2 inline scripts, got {len(inline)}')
           hashes=["'sha256-"+base64.b64encode(hashlib.sha256(x.encode()).digest()).decode()+"'" for x in inline]
           def csp(m):
             c=re.sub(r"script-src [^;]+","script-src 'self' file: "+' '.join(hashes),m.group(1),count=1)
             return '<meta http-equiv="Content-Security-Policy" content="'+c+'"'
-          s,n=re.subn(r'<meta\\s+http-equiv="Content-Security-Policy"\\s+content="([^"]+)"',csp,s,count=1,flags=re.I)
+          s,n=re.subn(r'<meta\s+http-equiv="Content-Security-Policy"\s+content="([^"]+)"',csp,s,count=1,flags=re.I)
           if n!=1: raise SystemExit('CSP meta not found')
           p.write_text(s,encoding='utf-8')
           PY
