@@ -40,6 +40,15 @@
 
 Το title, το `APP_VERSION`, το `REQUIRED_SCHEMA_VERSION`, η συμβατότητα Excel και το ορατό footer της εφαρμογής είναι όλα ευθυγραμμισμένα στην **v36.6.6 PRODUCTION RESILIENCE**.
 
+## Staging SQL package
+
+Το ελεγμένο πακέτο εφαρμογής της Φάσης 4 παράγεται απευθείας από τις migrations `202608090005`, `202608090006`, `202608090007` και τον verifier 113.
+
+SHA-256:
+
+- `01_APPLY_V36_6_6.sql`: `b9f65d415448d101b8c310d5460ff8c813e386ddb89eb2d21b5084c17906448d`
+- `02_VERIFY_V36_6_6_RESILIENCE.sql`: `468d51d0fba5a4fae1904e023dab611a74e83e91484a93ed45caa4513cf69e80`
+
 ## Backup / recovery
 
 Η τεχνική διαδικασία περιγράφεται στο `docs/PHASE4_DISASTER_RECOVERY.md`. Η εφαρμογή δεν αποθηκεύει database dumps ή credentials στο GitHub repository.
