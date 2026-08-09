@@ -18,7 +18,8 @@ jobs:
           python - <<'PY'
           from pathlib import Path
 
-          # GO-LIVE RESET v36.6.5 is intentionally a historical pre-v36.6.6 test.
+          # GO-LIVE RESET v36.6.5 is intentionally tested at its historical
+          # deployment point: migrations through 202608090004 only.
           p=Path('tests/go-live-reset-v36-6-5.test.mjs')
           s=p.read_text(encoding='utf-8')
           old="const migrations=()=>fs.readdirSync(migrationsDir).filter(x=>/^\\d+.*\\.sql$/i.test(x)).sort((a,b)=>a.localeCompare(b,'en'));"
@@ -27,25 +28,17 @@ jobs:
           s=s.replace(old,new,1)
           p.write_text(s,encoding='utf-8')
 
-          patches={
-            'tests/phase2-integrity-v36-6-4.test.mjs':[
-              ("τρέχον schema 36.6.5","τρέχον schema 36.6.6"),
-              ("`select public.app_schema_version()`),'36.6.5'","`select public.app_schema_version()`),'36.6.6'")
-            ],
-            'tests/phase3-financial-v36-6-5.test.mjs':[
-              ("clean install φτάνει σε schema 36.6.5","clean install φτάνει σε schema 36.6.6"),
-              ("`select public.app_schema_version()`),'36.6.5'","`select public.app_schema_version()`),'36.6.6'")
-            ],
-            'tests/production-readiness-v36-6-3.test.mjs':[
-              ("clean install εφαρμόζει αυτόματα ΟΛΕΣ τις migrations και φτάνει σε schema 36.6.5","clean install εφαρμόζει αυτόματα ΟΛΕΣ τις migrations και φτάνει σε schema 36.6.6"),
-              ("assert.equal(version, '36.6.5');","assert.equal(version, '36.6.6');")
-            ]
-          }
-          for fn,repls in patches.items():
+          # These suites intentionally validate the current schema after ALL
+          # migrations, so only their dotted current-version literal advances.
+          for fn in [
+            'tests/phase2-integrity-v36-6-4.test.mjs',
+            'tests/phase3-financial-v36-6-5.test.mjs',
+            'tests/production-readiness-v36-6-3.test.mjs'
+          ]:
             p=Path(fn); s=p.read_text(encoding='utf-8')
-            for old,new in repls:
-              if old not in s: raise SystemExit(f'{fn}: missing anchor {old}')
-              s=s.replace(old,new,1)
+            n=s.count('36.6.5')
+            if n<2: raise SystemExit(f'{fn}: expected at least 2 current-version literals, found {n}')
+            s=s.replace('36.6.5','36.6.6')
             p.write_text(s,encoding='utf-8')
           PY
       - name: Commit fixes
