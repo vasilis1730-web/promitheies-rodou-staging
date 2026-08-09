@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' file: 'sha256-NLpLpNcz/YNRtPjxWZxYhJhG/C9dgIDbxNMbQT8EKjY=' 'sha256-s5/Q4/tTb/YtDrx05rAnA0qbHY1dJqSyhOnD9WCMyxs='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; connect-src https://omncqldgtkdcjpqfwwlr.supabase.co wss://omncqldgtkdcjpqfwwlr.supabase.co https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'">
-<title>Δήμος Ρόδου · Προμήθειες &amp; Υπηρεσίες v36.6.4 PHASE 2 INTEGRITY</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' file: 'sha256-NLpLpNcz/YNRtPjxWZxYhJhG/C9dgIDbxNMbQT8EKjY=' 'sha256-jAMsUaC+p5ILnKVQDDGdJ13PaMM6H+UvVNem3uiD9iI='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; connect-src https://omncqldgtkdcjpqfwwlr.supabase.co wss://omncqldgtkdcjpqfwwlr.supabase.co https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'">
+<title>Δήμος Ρόδου · Προμήθειες &amp; Υπηρεσίες v36.6.5 CONTRACT PRICING</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Commissioner:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap&subset=greek,greek-ext,latin" rel="stylesheet">
@@ -2015,8 +2015,8 @@ window.ServiceTenderSpecs = (() => {
 const SUPABASE_URL='https://omncqldgtkdcjpqfwwlr.supabase.co';
 const SUPABASE_KEY='sb_publishable_0V8F7Ekgdql_4IrqG7f6xQ_LAu3K-Oe';
 let YEAR=2026;
-const APP_VERSION='v36.6.4-phase2-integrity', REQUIRED_SCHEMA_VERSION='36.6.4';
-const COMPATIBLE_EXCEL_VERSIONS=new Set(['v36.4','v36.5','v36.5.1','v36.5.2','v36.5.3-staging','v36.5.4-staging-fix','v36.5.5-service-catalog','v36.5.5-atavyros-hotfix','v36.5.5-groups-hotfix','v36.5.5-bulletins-hotfix','v36.5.5-bulletins-schema-hotfix','v36.6.0-admin-study-management','v36.6.1-order-issue-hotfix','v36.6.3-production-readiness','v36.6.4-phase2-integrity']);
+const APP_VERSION='v36.6.5-contract-pricing', REQUIRED_SCHEMA_VERSION='36.6.5';
+const COMPATIBLE_EXCEL_VERSIONS=new Set(['v36.4','v36.5','v36.5.1','v36.5.2','v36.5.3-staging','v36.5.4-staging-fix','v36.5.5-service-catalog','v36.5.5-atavyros-hotfix','v36.5.5-groups-hotfix','v36.5.5-bulletins-hotfix','v36.5.5-bulletins-schema-hotfix','v36.6.0-admin-study-management','v36.6.1-order-issue-hotfix','v36.6.3-production-readiness','v36.6.5-contract-pricing']);
 const VAT=0.24, CENTRAL_UNIT=11, DEFAULT_DIRECT_AWARD_CAP=30000;
 const RHODES_AWARD_GROUPS=Object.freeze([
   Object.freeze({group_no:1,name:'Ρόδου'}),
@@ -5455,7 +5455,7 @@ async function loadStudies(unitId){
 async function loadUnitAgg(unitId){
   const [o,c]=await Promise.all([
     sb.from("mo_orders").select("id,study_id,subtotal,status").eq("municipal_unit_id",unitId),
-    sb.from("mo_contracts").select("id,source_study_id,supplier_id,adam,protocol_no,start_date,end_date,total_amount").eq("municipal_unit_id",unitId)
+    sb.from("mo_contracts").select("id,source_study_id,supplier_id,adam,protocol_no,start_date,end_date,total_amount,estimated_amount,pricing_mode,discount_pct,vat_rate").eq("municipal_unit_id",unitId)
   ]);
   if(o.error)throw o.error; if(c.error)throw c.error;
   return {orders:o.data||[],contracts:c.data||[]};
@@ -5697,7 +5697,7 @@ function renderStudies(content){
     const ords=(st.agg.orders||[]).filter(o=>sameId(o.study_id,stdy.id));
     const issued=ords.filter(o=>CONSUMING.indexOf(o.status)>=0);
     const spent=Math.round(issued.reduce((s,o)=>s+num(o.subtotal),0)*100)/100;
-    const total=num(stdy.net_total);
+    const total=con?num(con.total_amount):num(stdy.net_total);
     const rem=Math.round((total-spent)*100)/100;
     const pct=total>0?Math.min(100,Math.round(spent/total*100)):0;
     const cls=rem<=0.005?"mo-over":(spent/Math.max(total,0.01)>0.75?"mo-warn":"");
@@ -5711,7 +5711,7 @@ function renderStudies(content){
       el("div",{class:"mo-study-sup"+(sup?" mo-ok-t":"")},supLine),
       el("div",{class:"mo-meter "+cls},el("i",{style:"width:"+pct+"%"})),
       el("div",{class:"mo-study-fig"},
-        el("span",{},"Καθαρή αξία: ",el("b",{},eur(total))),
+        el("span",{},con?"Συμβατική αξία: ":"Εκτιμώμενη αξία: ",el("b",{},eur(total))),
         el("span",{},"Δελτία: ",el("b",{},String(ords.length))),
         el("span",{},"Υπόλοιπο: ",el("b",{style:rem<0.005?"color:var(--mo-err)":"color:var(--mo-ok)"},eur(rem)))),
       el("div",{class:"mo-study-open"},"Άνοιγμα →")));
@@ -5763,7 +5763,7 @@ function renderWorkspace(content){
     box.append(el("div",{class:"mo-section-h"},"Στοιχεία ανάθεσης"));
     if(mayWrite()){
       box.append(el("p",{class:"mo-muted",style:"margin:0 0 12px"},
-        "Για την έκδοση δελτίων καταχωρίστε πρώτα την ανάθεση της μελέτης: "+(dm==="service"?"ανάδοχο":"προμηθευτή")+", στοιχεία επικοινωνίας και ΑΔΑΜ. Το τιμολόγιο ειδών εισάγεται αυτόματα από τη μελέτη ("+((stdy.lines||[]).length)+" είδη)."));
+        "Για την έκδοση δελτίων καταχωρίστε πρώτα την ανάθεση: "+(dm==="service"?"ανάδοχο":"προμηθευτή")+", ΑΔΑΜ/διάρκεια και την πραγματική οικονομική προσφορά. Η εκτιμώμενη αξία της μελέτης παραμένει χωριστή από τις κατακυρωμένες τιμές ("+((stdy.lines||[]).length)+" είδη)."));
       box.append(el("button",{class:"mo-btn mo-primary",onclick:()=>assignForm(null)},"＋ Καταχώριση ανάθεσης"));
     }else{
       box.append(el("p",{class:"mo-muted",style:"margin:0"},"Δεν έχει καταχωρηθεί ανάθεση για τη μελέτη — η καταχώριση γίνεται από τον χρήστη της Δ.Ε. ή τον διαχειριστή."));
@@ -5780,7 +5780,9 @@ function renderWorkspace(content){
         (sup.email?("✉ "+sup.email+"  "):"")+(sup.viber_phone?("📱 "+sup.viber_phone+"  "):"")+(sup.afm?("ΑΦΜ "+sup.afm):"")),
       el("div",{class:"mo-muted",style:"font-size:12.5px"},
         (st.contract.adam?("ΑΔΑΜ "+st.contract.adam+" · "):"")+(st.contract.protocol_no?(st.contract.protocol_no+" · "):"")+
-        dGR(st.contract.start_date)+"–"+dGR(st.contract.end_date)))));
+        dGR(st.contract.start_date)+"–"+dGR(st.contract.end_date)),
+      el("div",{class:"mo-muted",style:"font-size:12.5px"},
+        "Εκτιμώμενη: "+eur(st.contract.estimated_amount!=null?st.contract.estimated_amount:stdy.net_total)+" · Συμβατική: "+eur(st.contract.total_amount)+" · "+contractPricingModeLabel(st.contract)))));
   /* tabs */
   const tabs=el("div",{class:"mo-tabs"},
     el("button",{class:"mo-tab"+(st.view==="new"?" mo-on":""),onclick:()=>{st.view="new";renderAll();}},
@@ -5794,11 +5796,32 @@ function renderWorkspace(content){
 }
 
 /* ---------- φόρμα ανάθεσης (mo_contract από μελέτη) ---------- */
+function contractPricingModeLabel(c){
+  const m=(c&&c.pricing_mode)||"study";
+  if(m==="discount")return "Ενιαία έκπτωση "+qy(c.discount_pct||0)+"%";
+  if(m==="item_prices")return "Κατακυρωμένες τιμές ανά είδος";
+  return "Τιμές μελέτης";
+}
+function contractPricingRows(stdy,existing){
+  const src=existing?(st.citems||[]):(stdy.lines||[]);
+  return src.map((x,i)=>({
+    key:String(x.id||x.material_id||i),
+    contract_item_id:existing?x.id:null,
+    material_id:x.material_id||null,
+    code:x.code||"",
+    description:x.description||x.name||x.short_name||"—",
+    unit:x.unit||"",
+    quantity:num(x.contract_qty!=null?x.contract_qty:x.quantity),
+    estimated_price:num(x.estimated_unit_price!=null?x.estimated_unit_price:x.unit_price),
+    actual_price:num(x.unit_price)
+  }));
+}
 function assignForm(existing){
   const stdy=st.study,dm=domainOf(stdy);
   const isNew=!existing;
   const c=existing?Object.assign({},existing):{supplier_id:"",adam:"",protocol_no:"",
-    start_date:todayISO(),end_date:stdy.request_year+"-12-31"};
+    start_date:todayISO(),end_date:stdy.request_year+"-12-31",vat_rate:num(S.vat)||24,
+    pricing_mode:"study",discount_pct:0};
   const f={};
   const supSel=el("select",{});
   function fillSup(selId){
@@ -5809,47 +5832,118 @@ function assignForm(existing){
   fillSup();
   const grName=(stdy.procurement_groups||{}).name||"";
   const autoTitle=(dm==="service"?"Παροχή υπηρεσιών: ":"Προμήθεια: ")+grName+" — "+unitName(st.unitId)+" "+stdy.request_year+" (Μελέτη Νο"+(stdy.seq||1)+")";
+  const rows=contractPricingRows(stdy,existing);
+  const modeSel=el("select",{disabled:existing?"":null},
+    el("option",{value:"study",selected:(c.pricing_mode||"study")==="study"?"":null},"Ίδιες τιμές με τη μελέτη"),
+    el("option",{value:"discount",selected:c.pricing_mode==="discount"?"":null},"Ενιαία έκπτωση %"),
+    el("option",{value:"item_prices",selected:c.pricing_mode==="item_prices"?"":null},"Πραγματική τιμή ανά είδος"));
+  const discountInp=el("input",{type:"number",min:"0",max:"99.9999",step:"0.0001",value:c.discount_pct||0,disabled:existing?"":null});
+  const itemBody=el("tbody",{});
+  const priceInputs=new Map();
+  rows.forEach((r,i)=>{
+    const inp=el("input",{type:"number",min:"0",step:"0.0001",value:r.actual_price||r.estimated_price,disabled:existing?"":null,style:"width:110px"});
+    priceInputs.set(r.key,inp);
+    itemBody.append(el("tr",{},
+      el("td",{},String(i+1)),
+      el("td",{},(r.code?r.code+" — ":"")+r.description),
+      el("td",{},r.unit||"—"),
+      el("td",{style:"text-align:right"},qy(r.quantity)),
+      el("td",{style:"text-align:right"},eur(r.estimated_price)),
+      el("td",{style:"text-align:right"},inp)));
+  });
+  const itemBox=el("div",{style:"overflow:auto;max-height:280px;border:1px solid var(--line);border-radius:8px"},
+    el("table",{class:"data",style:"width:100%;font-size:12px"},
+      el("thead",{},el("tr",{},el("th",{},"Α/Α"),el("th",{},"Είδος / εργασία"),el("th",{},"Μον."),el("th",{},"Ποσ."),el("th",{},"Τιμή μελέτης"),el("th",{},"Συμβατική τιμή"))),itemBody));
+  const itemSection=el("div",{},itemBox);
+  const discountSection=el("div",{class:"mo-field"},el("label",{},"Ενιαία έκπτωση %"),discountInp);
+  const preview=el("div",{class:"mo-card mo-pad",style:"margin:10px 0;background:#F8FBFE"});
+  const pricingHelp=el("p",{class:"mo-muted",style:"font-size:12px;margin:6px 0 0"},
+    existing?"Οι κατακυρωμένες τιμές της υφιστάμενης σύμβασης είναι αμετάβλητες. Εδώ επιτρέπεται μόνο διορθωτική ενημέρωση διοικητικών στοιχείων.":
+    "Η εκτιμώμενη αξία παραμένει αυτή της κλειδωμένης μελέτης και συνεχίζει να προσμετράται στο όριο των 30.000 €. Η πραγματική συμβατική αξία προκύπτει από την οικονομική προσφορά.");
+  function pricingTotal(){
+    const mode=modeSel.value;
+    const disc=Math.max(0,Math.min(99.9999,num(discountInp.value)));
+    return Math.round(rows.reduce((sum,r)=>{
+      let pr=r.estimated_price;
+      if(mode==="discount")pr=r.estimated_price*(100-disc)/100;
+      else if(mode==="item_prices")pr=num((priceInputs.get(r.key)||{}).value);
+      return sum+r.quantity*pr;
+    },0)*100)/100;
+  }
+  function updatePricingUI(){
+    const mode=modeSel.value;
+    discountSection.style.display=mode==="discount"?"":"none";
+    itemSection.style.display=mode==="item_prices"?"":"none";
+    const estimated=num(stdy.net_total),actual=pricingTotal(),saving=Math.round((estimated-actual)*100)/100;
+    preview.innerHTML="";
+    preview.append(
+      el("div",{class:"mo-study-fig"},
+        el("span",{},"Εκτιμώμενη καθαρή αξία: ",el("b",{},eur(estimated))),
+        el("span",{},"Συμβατική καθαρή αξία: ",el("b",{style:actual>estimated+0.005?"color:var(--mo-err)":"color:var(--mo-ok)"},eur(actual))),
+        el("span",{},"Διαφορά: ",el("b",{},eur(saving)))),
+      el("div",{class:"mo-muted",style:"font-size:11.5px;margin-top:5px"},"Τρόπος: "+(mode==="study"?"τιμές μελέτης":mode==="discount"?("ενιαία έκπτωση "+qy(discountInp.value)+"%"):"πραγματικές τιμές ανά είδος")));
+  }
+  modeSel.addEventListener("change",updatePricingUI);
+  discountInp.addEventListener("input",updatePricingUI);
+  priceInputs.forEach(inp=>inp.addEventListener("input",updatePricingUI));
+  const vatField=fld("ΦΠΑ %","vat_rate","number",c.vat_rate!=null?c.vat_rate:(num(S.vat)||24),f);
+  f.vat_rate.step="0.01";f.vat_rate.min="0";f.vat_rate.max="100";if(existing)f.vat_rate.disabled=true;
   const body=el("div",{},
     el("p",{class:"mo-muted",style:"margin-top:0"},el("b",{},studyTitle(stdy)),
-      " · Καθαρή αξία: ",el("b",{},eur(stdy.net_total)),
+      " · Εκτιμώμενη καθαρή αξία: ",el("b",{},eur(stdy.net_total)),
       stdy.supplier_name?(" · Προμηθευτής μελέτης: "+stdy.supplier_name):""),
     el("div",{class:"mo-field"},el("label",{},LBL().partyLbl+" *"),
       el("div",{style:"display:flex;gap:8px;align-items:center"},supSel,
         el("button",{class:"mo-btn mo-sm",type:"button",onclick:()=>supplierForm(null,ns=>{fillSup(ns.id);supSel.value=ns.id;},stdy.supplier_name||"")},"＋ Νέος"))),
     row2(fld("ΑΔΑΜ","adam","text",c.adam,f,"π.χ. 26SYMV000000000"),fld("Αρ. πρωτοκόλλου","protocol_no","text",c.protocol_no,f)),
     row2(fld("Έναρξη","start_date","date",c.start_date,f),fld("Λήξη","end_date","date",c.end_date,f)),
-    el("p",{class:"mo-muted",style:"font-size:12px"},"Το συμβατικό ποσό ορίζεται αυτόματα ίσο με την καθαρή αξία της μελέτης ("+eur(stdy.net_total)+") και το τιμολόγιο ειδών εισάγεται από τις γραμμές της."));
+    vatField,
+    el("div",{class:"mo-field"},el("label",{},"Οικονομική προσφορά / συμβατικές τιμές"),modeSel),
+    discountSection,itemSection,preview,pricingHelp);
+  updatePricingUI();
   openModal(isNew?"Καταχώριση ανάθεσης":"Επεξεργασία ανάθεσης",body,[
     {label:"Άκυρο",cls:"mo-btn",act:closeModal},
     {label:"Αποθήκευση",cls:"mo-btn mo-primary",act:async()=>{
       const supplier_id=supSel.value;
       if(!supplier_id){T("Επιλέξτε "+(dm==="service"?"ανάδοχο":"προμηθευτή")+".","warn");return;}
-      const data={supplier_id:supplier_id,adam:(val(f,"adam",c.adam)||"").trim()||null,
+      const data={supplier_id,adam:(val(f,"adam",c.adam)||"").trim()||null,
         protocol_no:(val(f,"protocol_no",c.protocol_no)||"").trim()||null,
-        start_date:val(f,"start_date",c.start_date)||null,end_date:val(f,"end_date",c.end_date)||null};
+        start_date:val(f,"start_date",c.start_date)||null,end_date:val(f,"end_date",c.end_date)||null,
+        vat_rate:num(val(f,"vat_rate",c.vat_rate!=null?c.vat_rate:24))};
+      if(data.vat_rate<0||data.vat_rate>100){T("Ο ΦΠΑ πρέπει να είναι από 0% έως 100%.","warn");return;}
       try{
-        const {error}=await sb.rpc('save_contract_atomic',{
-          p_contract_id:isNew?null:String(existing.id),
-          p_study_id:String(stdy.id),
-          p_supplier_id:String(supplier_id),
-          p_title:autoTitle,
-          p_adam:data.adam,
-          p_protocol_no:data.protocol_no,
-          p_start_date:data.start_date,
-          p_end_date:data.end_date,
-          p_vat_rate:num(S.vat)||24
-        });
+        let error=null;
+        if(isNew){
+          const mode=modeSel.value,discount=num(discountInp.value);
+          const actual=pricingTotal();
+          if(actual>num(stdy.net_total)+0.005){T("Η συμβατική αξία δεν μπορεί να υπερβαίνει την εκτιμώμενη αξία της μελέτης.","warn");return;}
+          let itemPrices=null;
+          if(mode==="item_prices"){
+            itemPrices=rows.map(r=>({material_id:String(r.material_id||""),unit_price:num((priceInputs.get(r.key)||{}).value)}));
+            if(itemPrices.some(x=>!x.material_id||x.unit_price<0)){T("Συμπληρώστε έγκυρη συμβατική τιμή για κάθε είδος.","warn");return;}
+          }
+          ({error}=await sb.rpc('save_contract_pricing_atomic',{
+            p_contract_id:null,p_study_id:String(stdy.id),p_supplier_id:String(supplier_id),p_title:autoTitle,
+            p_adam:data.adam,p_protocol_no:data.protocol_no,p_start_date:data.start_date,p_end_date:data.end_date,
+            p_vat_rate:data.vat_rate,p_pricing_mode:mode,p_discount_pct:mode==="discount"?discount:0,p_item_prices:itemPrices
+          }));
+        }else{
+          ({error}=await sb.rpc('save_contract_atomic',{
+            p_contract_id:String(existing.id),p_study_id:String(stdy.id),p_supplier_id:String(supplier_id),p_title:autoTitle,
+            p_adam:data.adam,p_protocol_no:data.protocol_no,p_start_date:data.start_date,p_end_date:data.end_date,p_vat_rate:num(existing.vat_rate)
+          }));
+        }
         if(error)throw error;
-        closeModal();T("Η ανάθεση αποθηκεύτηκε.","ok");
+        closeModal();T(isNew?"Η ανάθεση και οι κατακυρωμένες τιμές αποθηκεύτηκαν.":"Τα διοικητικά στοιχεία της ανάθεσης ενημερώθηκαν.","ok");
         await openStudy(stdy);
       }catch(e){T("Σφάλμα: "+(e.message||e),"err");}
-    }}]);
+    }}],true);
 }
 
 /* ---------- φόρμα δελτίου ---------- */
 function blankForm(){
   return {id:null,order_no:null,order_date:todayISO(),receiver_id:"",usage_location:"",notes:"",
-    vat_rate:num(S.vat)||24,status:"draft",created_by:ME.id,
+    vat_rate:num(st.contract&&st.contract.vat_rate!=null?st.contract.vat_rate:S.vat)||24,status:"draft",created_by:ME.id,
     items:[{key:uid(),ref:"",description:"",unit:"",quantity:"",unit_price:"",mapping:[]}]};
 }
 function ensureForm(){if(!st.form)st.form=blankForm();return st.form;}
@@ -6669,6 +6763,6 @@ return {enter:enter,leaveGuard:leaveGuard,invalidateAfterLock:invalidateAfterLoc
 
 boot();
 </script>
-<div class="dev-credit">developer Vasilis Diakolios · v36.6.4 PHASE 2 INTEGRITY</div>
+<div class="dev-credit">developer Vasilis Diakolios · v36.6.5 CONTRACT PRICING</div>
 </body>
 </html>
