@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' file: 'sha256-NLpLpNcz/YNRtPjxWZxYhJhG/C9dgIDbxNMbQT8EKjY=' 'sha256-Qmw0HKAtJr94XziO8HslzzfMEd+lQ02lXnoeJEfE7ps='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; connect-src https://omncqldgtkdcjpqfwwlr.supabase.co wss://omncqldgtkdcjpqfwwlr.supabase.co https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'">
-<title>Δήμος Ρόδου · Προμήθειες &amp; Υπηρεσίες v36.6.5 CONTRACT PRICING</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self';script-src 'self' file: 'sha256-NLpLpNcz/YNRtPjxWZxYhJhG/C9dgIDbxNMbQT8EKjY=' 'sha256-waCoTaq02JY4DY56C4JBtCoiAEMnJ7s32Ps6tHiLhcQ='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; connect-src https://omncqldgtkdcjpqfwwlr.supabase.co wss://omncqldgtkdcjpqfwwlr.supabase.co https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'">
+<title>Δήμος Ρόδου · Προμήθειες &amp; Υπηρεσίες v36.6.6 PRODUCTION RESILIENCE</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Commissioner:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap&subset=greek,greek-ext,latin" rel="stylesheet">
@@ -2015,8 +2015,8 @@ window.ServiceTenderSpecs = (() => {
 const SUPABASE_URL='https://omncqldgtkdcjpqfwwlr.supabase.co';
 const SUPABASE_KEY='sb_publishable_0V8F7Ekgdql_4IrqG7f6xQ_LAu3K-Oe';
 let YEAR=2026;
-const APP_VERSION='v36.6.5-contract-pricing', REQUIRED_SCHEMA_VERSION='36.6.5';
-const COMPATIBLE_EXCEL_VERSIONS=new Set(['v36.4','v36.5','v36.5.1','v36.5.2','v36.5.3-staging','v36.5.4-staging-fix','v36.5.5-service-catalog','v36.5.5-atavyros-hotfix','v36.5.5-groups-hotfix','v36.5.5-bulletins-hotfix','v36.5.5-bulletins-schema-hotfix','v36.6.0-admin-study-management','v36.6.1-order-issue-hotfix','v36.6.3-production-readiness','v36.6.5-contract-pricing']);
+const APP_VERSION='v36.6.6-production-resilience', REQUIRED_SCHEMA_VERSION='36.6.6';
+const COMPATIBLE_EXCEL_VERSIONS=new Set(['v36.4','v36.5','v36.5.1','v36.5.2','v36.5.3-staging','v36.5.4-staging-fix','v36.5.5-service-catalog','v36.5.5-atavyros-hotfix','v36.5.5-groups-hotfix','v36.5.5-bulletins-hotfix','v36.5.5-bulletins-schema-hotfix','v36.6.0-admin-study-management','v36.6.1-order-issue-hotfix','v36.6.3-production-readiness','v36.6.5-contract-pricing','v36.6.6-production-resilience']);
 const VAT=0.24, CENTRAL_UNIT=11, DEFAULT_DIRECT_AWARD_CAP=30000;
 const RHODES_AWARD_GROUPS=Object.freeze([
   Object.freeze({group_no:1,name:'Ρόδου'}),
@@ -2027,6 +2027,67 @@ const RHODES_AWARD_GROUPS=Object.freeze([
 const sb=(window.supabase&&typeof window.supabase.createClient==='function')
   ? window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY)
   : null;
+
+let MANUAL_LOGOUT=false, SESSION_RECOVERY=false;
+const PENDING_OPERATIONS=new Map();
+function newOperationId(){
+  if(window.crypto&&typeof window.crypto.randomUUID==='function')return window.crypto.randomUUID();
+  const b=new Uint8Array(16);window.crypto.getRandomValues(b);b[6]=(b[6]&15)|64;b[8]=(b[8]&63)|128;
+  const h=[...b].map(x=>x.toString(16).padStart(2,'0')).join('');
+  return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20);
+}
+function rpcSignature(args){try{return JSON.stringify(args||{});}catch{return String(Date.now());}}
+function isTransportFailure(error){
+  const msg=String(error&&error.message||error||'');
+  return navigator.onLine===false||/failed to fetch|network(?:error)?|load failed|fetch failed|timeout|timed out|connection.*(?:closed|reset|lost)|socket/i.test(msg);
+}
+function isSessionExpiredError(error){
+  const status=Number(error&&error.status)||0,code=String(error&&error.code||'');
+  const msg=String(error&&error.message||error||'');
+  return status===401||code==='PGRST301'||/jwt.*(?:expired|invalid)|token.*expired|session.*expired|refresh token/i.test(msg);
+}
+function enterSessionRecovery(message){
+  if(!ME||!ME.id)return;
+  SESSION_RECOVERY=true;
+  $('#login').classList.remove('hidden');
+  $('#app').classList.add('hidden');
+  showLoginError(message||'Η συνεδρία έληξε. Συνδεθείτε ξανά. Οι μη αποθηκευμένες αλλαγές παραμένουν σε αυτή την καρτέλα και δεν θα αντικατασταθούν κατά την επανασύνδεση.');
+}
+async function resumeSessionAfterLogin(session){
+  if(!session||!session.user)throw new Error('Η επανασύνδεση δεν δημιούργησε ενεργή συνεδρία.');
+  const results=await Promise.all([
+    sb.from('profiles').select('role,municipal_unit_id,full_name,email').eq('id',session.user.id).single(),
+    sb.from('user_app_permissions').select('can_supervise').eq('user_id',session.user.id).maybeSingle(),
+    sb.rpc('app_schema_version')
+  ]);
+  const prof=results[0].data,profileError=results[0].error,perm=results[1].data,permError=results[1].error;
+  const schemaVersion=results[2].data,schemaError=results[2].error;
+  if(profileError||!prof)throw new Error('Δεν βρέθηκε ενεργό προφίλ εφαρμογής μετά την επανασύνδεση.');
+  if(permError||schemaError)throw new Error('Δεν ολοκληρώθηκε ο έλεγχος δικαιωμάτων μετά την επανασύνδεση.');
+  if(String(schemaVersion)!==REQUIRED_SCHEMA_VERSION)throw new Error('Η βάση δεν βρίσκεται στην απαιτούμενη έκδοση '+REQUIRED_SCHEMA_VERSION+'.');
+  ME={id:session.user.id,role:prof.role,unitId:prof.municipal_unit_id,email:prof.email,name:prof.full_name||prof.email||'Χρήστης',canSupervise:!!(perm&&perm.can_supervise)};
+  SESSION_RECOVERY=false;
+  clearLoginError();$('#login').classList.add('hidden');$('#app').classList.remove('hidden');
+  $('#whoName').textContent=ME.name;$('#whoRole').textContent=ROLE_LABEL[ME.role]||ME.role;
+  updateAdminControls();if(typeof render==='function')render();
+  toast('Η συνεδρία αποκαταστάθηκε. Οι μη αποθηκευμένες αλλαγές διατηρήθηκαν. Μπορείτε να επαναλάβετε την ενέργεια.','accent');
+}
+async function resilientRpc(name,args,operationKey){
+  if(!sb)return {data:null,error:new Error('Δεν υπάρχει σύνδεση με τη βάση.')};
+  const key=String(operationKey||name),signature=rpcSignature(args);
+  let pending=PENDING_OPERATIONS.get(key);
+  if(!pending||pending.signature!==signature){pending={id:newOperationId(),signature};PENDING_OPERATIONS.set(key,pending);}
+  const callArgs={p_operation_id:pending.id,...args};
+  for(let attempt=0;attempt<2;attempt++){
+    let result;
+    try{result=await sb.rpc(name,callArgs);}catch(error){result={data:null,error};}
+    if(!result||!result.error){PENDING_OPERATIONS.delete(key);return result||{data:null,error:null};}
+    if(isSessionExpiredError(result.error)){enterSessionRecovery();return result;}
+    if(!isTransportFailure(result.error)){PENDING_OPERATIONS.delete(key);return result;}
+    if(attempt===0&&navigator.onLine!==false){await new Promise(resolve=>setTimeout(resolve,300));continue;}
+    return result;
+  }
+}
 
 const $=s=>document.querySelector(s);
 const fmtN=n=>Number(n).toLocaleString('el-GR',{maximumFractionDigits:3});
@@ -2210,7 +2271,7 @@ let AWARD_CONFIG=null, AWARD_GROUPS=[], AWARD_MEMBERSHIPS=[];
 let AWARD_CONFIG_CANONICAL=false, AWARD_CONFIG_VALIDATION='';
 let AWARD_SCHEMA_READY=true, AWARD_CONFIG_ERROR='';
 let OVERVIEW={byUnit:{},byMaterial:{}};
-let reqId=null, lines={}, baseline={}, dirty=false, prefillHint=false, cleanView=false;
+let reqId=null, reqRevision=0, lines={}, baseline={}, dirty=false, prefillHint=false, cleanView=false;
 let hiddenMaterials=new Set(), undoStack=[], redoStack=[], sortState={key:'sort_order',dir:'asc'};
 
 function syncTotalsClearance(){
@@ -2271,8 +2332,9 @@ async function doLogin(){
   if(!email||!password){showLoginError('Συμπληρώστε email και κωδικό.');return;}
   setLoginBusy(true);
   try{
-    const {error}=await sb.auth.signInWithPassword({email,password});
+    const {data,error}=await sb.auth.signInWithPassword({email,password});
     if(error){showLoginError(authErrorMessage(error));return;}
+    if(SESSION_RECOVERY&&ME.id){await resumeSessionAfterLogin(data&&data.session);return;}
     const result=await boot();
     if(!result.ok&&result.code==='no_session')showLoginError('Η σύνδεση δεν δημιούργησε ενεργή συνεδρία. Δοκιμάστε ξανά.');
   }catch(error){
@@ -2281,7 +2343,10 @@ async function doLogin(){
     setLoginBusy(false);
   }
 }
-$('#logoutBtn').onclick=async()=>{if(sb)await sb.auth.signOut();location.reload();};
+$('#logoutBtn').onclick=async()=>{MANUAL_LOGOUT=true;if(sb)await sb.auth.signOut();location.reload();};
+if(sb&&sb.auth&&typeof sb.auth.onAuthStateChange==='function'){
+  sb.auth.onAuthStateChange((event)=>{if(event==='SIGNED_OUT'&&!MANUAL_LOGOUT&&ME.id)enterSessionRecovery();});
+}
 document.querySelectorAll('#chooser [data-mode]').forEach(b=>b.addEventListener('click',()=>enterMode(b.dataset.mode)));
 document.querySelectorAll('#modeSwitch [data-mode]').forEach(b=>b.addEventListener('click',()=>switchMode(b.dataset.mode)));
 
@@ -2657,7 +2722,7 @@ async function openView(){
   $('#btnSave').disabled=!writable; $('#btnClean').disabled=!writable;
   $('#btnRefresh').classList.toggle('hidden', !(isCentral && writable));
   $('#banner').classList.add('hidden');
-  reqId=null; lines={}; baseline={}; prefillHint=false; cleanView=false; hiddenMaterials=new Set(); undoStack=[]; redoStack=[]; sortState={key:'sort_order',dir:'asc'}; setDirty(false); updateAdminControls();
+  reqId=null; reqRevision=0; lines={}; baseline={}; prefillHint=false; cleanView=false; hiddenMaterials=new Set(); undoStack=[]; redoStack=[]; sortState={key:'sort_order',dir:'asc'}; setDirty(false); updateAdminControls();
   renderLoading();
   try{ await loadUnitRequest(); await loadLocked(); await loadOverview(); }
   catch(e){ toast('Σφάλμα φόρτωσης: '+(e.message||e),'err'); }
@@ -2665,7 +2730,7 @@ async function openView(){
 }
 function renderNoCatalogState(){
   const isService=MODE==='service';
-  reqId=null;lines={};baseline={};dirty=false;prefillHint=false;cleanView=false;
+  reqId=null;reqRevision=0;lines={};baseline={};dirty=false;prefillHint=false;cleanView=false;
   hiddenMaterials=new Set();undoStack=[];redoStack=[];
   $('#ptEyebrow').textContent='Δ.Ε. '+unitName(cur.unitId);
   $('#ptTitle').textContent=isService?'Δεν έχει εισαχθεί κατάλογος υπηρεσιών':'Δεν υπάρχουν ενεργές ομάδες προμηθειών';
@@ -2689,10 +2754,11 @@ function renderLoading(){setSafeHtml($('#tbody'),'<tr class="loadrow"><td colspa
 
 async function loadUnitRequest(){
   if(cur.unitId==null||cur.groupId==null)return;
-  const {data:reqs,error}=await sb.from('unit_requests').select('id,status')
+  reqRevision=0;
+  const {data:reqs,error}=await sb.from('unit_requests').select('id,status,revision')
     .eq('municipal_unit_id',cur.unitId).eq('group_id',cur.groupId).eq('request_year',YEAR).limit(1);
   if(error)throw error;
-  if(reqs&&reqs.length){ reqId=reqs[0].id; cleanView=(reqs[0].status==='cleaned');
+  if(reqs&&reqs.length){ reqId=reqs[0].id; reqRevision=Number(reqs[0].revision)||0; cleanView=(reqs[0].status==='cleaned');
     const {data:ls,error:e2}=await sb.from('request_lines').select('material_id,quantity,unit_price,comments').eq('request_id',reqId);
     if(e2)throw e2; (ls||[]).forEach(l=>{lines[l.material_id]={q:Number(l.quantity),p:l.unit_price==null?null:Number(l.unit_price)};if(l.comments==='__hidden__')hiddenMaterials.add(String(l.material_id));});
   }
@@ -2911,7 +2977,8 @@ async function saveAll(clean){
   const btn=clean?$('#btnClean'):$('#btnSave'); const old=btn.innerHTML; btn.disabled=true; setSafeHtml(btn,'<span class="spin" style="width:14px;height:14px;margin:0 6px 0 0"></span>'+(clean?'Καθαρισμός…':'Αποθήκευση…'));
   try{
     const payload=requestLinesPayload();
-    const {data,error}=await sb.rpc('save_unit_request_atomic',{
+    const {data,error}=await resilientRpc('save_unit_request_resilient_atomic',{
+      p_expected_revision:reqRevision,
       p_request_id:reqId==null?null:String(reqId),
       p_municipal_unit_id:cur.unitId,
       p_group_id:cur.groupId,
@@ -2919,9 +2986,10 @@ async function saveAll(clean){
       p_title:'Δελτίο προμήθειας '+YEAR,
       p_action:clean?'save_clean':'save',
       p_lines:payload
-    });
+    },'request:'+cur.unitId+':'+cur.groupId+':'+YEAR+':'+(clean?'clean':'save'));
     if(error)throw error;
     if(data&&data.request_id!=null)reqId=data.request_id;
+    if(data&&data.revision!=null)reqRevision=Number(data.revision)||0;
     lines={}; hiddenMaterials=new Set(); const {data:ls}=await sb.from('request_lines').select('material_id,quantity,unit_price,comments').eq('request_id',reqId);
     (ls||[]).forEach(l=>{lines[l.material_id]={q:Number(l.quantity),p:l.unit_price==null?null:Number(l.unit_price)};if(l.comments==='__hidden__')hiddenMaterials.add(String(l.material_id));});
     baseline=JSON.parse(JSON.stringify(lines)); prefillHint=false; cleanView=!!clean;
@@ -3227,7 +3295,8 @@ async function doLock(){
     const supplier=($('#lockSupplier').value||'').trim()||null;
     let kimdis=($('#lockKimdis').value||'').trim(); if(kimdis&&!/^https?:\/\//i.test(kimdis))kimdis='https://'+kimdis; kimdis=kimdis||null;
     const label=($('#lockLabel').value||'').trim()||null;
-    const {data,error}=await sb.rpc('lock_study_atomic',{
+    const {data,error}=await resilientRpc('lock_study_resilient_atomic',{
+      p_expected_revision:reqRevision,
       p_request_id:reqId==null?null:String(reqId),
       p_municipal_unit_id:cur.unitId,
       p_group_id:cur.groupId,
@@ -3236,9 +3305,10 @@ async function doLock(){
       p_supplier_name:supplier,
       p_kimdis_url:kimdis,
       p_lines:payload
-    });
+    },'lock:'+cur.unitId+':'+cur.groupId+':'+YEAR);
     if(error)throw error;
     if(data&&data.request_id!=null)reqId=data.request_id;
+    if(data&&data.revision!=null)reqRevision=Number(data.revision)||0;
     MO.invalidateAfterLock(cur.unitId);
     const seq=Number(data&&data.seq)||0;
     lines={}; baseline={}; hiddenMaterials=new Set(); cleanView=false; prefillHint=false; setDirty(false);
@@ -3423,11 +3493,13 @@ async function loadStudyTemplate(id,button){
   if(button)button.disabled=true;
   const before=captureUiState('Πριν από φόρτωση προτύπου');
   try{
-    const {data,error}=await sb.rpc('load_study_template_atomic',{
+    const {data,error}=await resilientRpc('load_study_template_resilient_atomic',{
+      p_expected_revision:reqRevision,
       p_template_id:String(id),p_municipal_unit_id:cur.unitId,p_group_id:cur.groupId,p_request_year:YEAR
-    });
+    },'template-load:'+cur.unitId+':'+cur.groupId+':'+YEAR);
     if(error)throw error;
-    reqId=data&&data.request_id?data.request_id:reqId;
+    if(data&&data.request_id!=null)reqId=data.request_id;
+    if(data&&data.revision!=null)reqRevision=Number(data.revision)||0;
     lines={};hiddenMaterials=new Set();
     const {data:ls,error:linesError}=await sb.from('request_lines')
       .select('material_id,quantity,unit_price,comments').eq('request_id',reqId);
@@ -4359,7 +4431,8 @@ async function importQuantitiesFromFile(file){
   }
 
   try{
-    const {data,error}=await sb.rpc('secure_import_catalog_request_atomic',{
+    const {data,error}=await resilientRpc('secure_import_catalog_request_resilient_atomic',{
+      p_expected_revision:reqRevision,
       p_import_token:importContext.exportToken,
       p_request_id:reqId==null?null:String(reqId),
       p_municipal_unit_id:cur.unitId,
@@ -4369,9 +4442,10 @@ async function importQuantitiesFromFile(file){
       p_material_updates:catalogUpdates,
       p_new_materials:newMaterials,
       p_lines:requestPayload
-    });
+    },'excel:'+String(importContext.exportToken));
     if(error)throw error;
     if(data&&data.request_id!=null)reqId=data.request_id;
+    if(data&&data.revision!=null)reqRevision=Number(data.revision)||0;
   }catch(e){
     restoreUiState(importSnapshot);
     throw e;
@@ -4528,14 +4602,19 @@ async function copyCurrentGroup(){
   const btn=$('#copyConfirm'),old=btn.textContent;btn.disabled=true;btn.textContent='Αντιγραφή…';
   try{
     const payload=srcItems.map(x=>({material_id:String(x.m.id),quantity:x.q,unit_price:x.p==null?0:Number(x.p),comments:null}));
-    const {error}=await sb.rpc('copy_unit_request_atomic',{
+    const {data:destReqs,error:destReqError}=await sb.from('unit_requests').select('id,revision')
+      .eq('municipal_unit_id',destId).eq('group_id',cur.groupId).eq('request_year',YEAR).limit(1);
+    if(destReqError)throw destReqError;
+    const destRevision=(destReqs&&destReqs.length)?(Number(destReqs[0].revision)||0):0;
+    const {error}=await resilientRpc('copy_unit_request_resilient_atomic',{
+      p_expected_destination_revision:destRevision,
       p_source_municipal_unit_id:cur.unitId,
       p_destination_municipal_unit_id:destId,
       p_group_id:cur.groupId,
       p_request_year:YEAR,
       p_title:'Δελτίο προμήθειας '+YEAR,
       p_lines:payload
-    });
+    },'copy:'+destId+':'+cur.groupId+':'+YEAR);
     if(error)throw error;
     $('#copyModal').classList.remove('open');toast('Η ομάδα αντιγράφηκε στη Δ.Ε. '+destLabel+'.','accent');
   }catch(e){toast('Σφάλμα αντιγραφής: '+(e.message||e),'err');}
@@ -5922,16 +6001,17 @@ function assignForm(existing){
             itemPrices=rows.map(r=>({material_id:String(r.material_id||""),unit_price:num((priceInputs.get(r.key)||{}).value)}));
             if(itemPrices.some(x=>!x.material_id||x.unit_price<0)){T("Συμπληρώστε έγκυρη συμβατική τιμή για κάθε είδος.","warn");return;}
           }
-          ({error}=await sb.rpc('save_contract_pricing_atomic',{
+          ({error}=await resilientRpc('save_contract_pricing_resilient_atomic',{
             p_contract_id:null,p_study_id:String(stdy.id),p_supplier_id:String(supplier_id),p_title:autoTitle,
             p_adam:data.adam,p_protocol_no:data.protocol_no,p_start_date:data.start_date,p_end_date:data.end_date,
             p_vat_rate:data.vat_rate,p_pricing_mode:mode,p_discount_pct:mode==="discount"?discount:0,p_item_prices:itemPrices
-          }));
+          },'contract:'+String(stdy.id)));
         }else{
-          ({error}=await sb.rpc('save_contract_atomic',{
+          ({error}=await resilientRpc('save_contract_pricing_resilient_atomic',{
             p_contract_id:String(existing.id),p_study_id:String(stdy.id),p_supplier_id:String(supplier_id),p_title:autoTitle,
-            p_adam:data.adam,p_protocol_no:data.protocol_no,p_start_date:data.start_date,p_end_date:data.end_date,p_vat_rate:num(existing.vat_rate)
-          }));
+            p_adam:data.adam,p_protocol_no:data.protocol_no,p_start_date:data.start_date,p_end_date:data.end_date,p_vat_rate:num(existing.vat_rate),
+            p_pricing_mode:existing.pricing_mode||'study',p_discount_pct:num(existing.discount_pct),p_item_prices:null
+          },'contract:'+String(stdy.id)));
         }
         if(error)throw error;
         closeModal();T(isNew?"Η ανάθεση και οι κατακυρωμένες τιμές αποθηκεύτηκαν.":"Τα διοικητικά στοιχεία της ανάθεσης ενημερώθηκαν.","ok");
@@ -6237,7 +6317,8 @@ function validate(o,forIssue){
   return errs;
 }
 async function persistOrder(o,forIssue){
-  const {data,error}=await sb.rpc('save_order_atomic',{
+  const {data,error}=await resilientRpc('save_order_resilient_atomic',{
+    
     p_order_id:o.id==null?null:String(o.id),
     p_study_id:String(st.study.id),
     p_order_date:o.order_date,
@@ -6247,7 +6328,7 @@ async function persistOrder(o,forIssue){
     p_vat_rate:o.vat_rate,
     p_items:o.items,
     p_issue:!!forIssue
-  });
+  },'order:'+String(o.id||st.study.id)+':'+(forIssue?'issue':'save'));
   if(error)throw error;
   if(st.form&&!st.form.id&&data&&data.order_id)st.form.id=data.order_id;
   return data;
