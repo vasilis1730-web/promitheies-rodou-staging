@@ -1,11 +1,11 @@
-name: Apply Phase4 resilient frontend
+name: Cleanup Phase4 temporary helpers
 on:
   push:
     branches: [agent/v36-6-6-resilience]
 permissions:
   contents: write
 jobs:
-  patch:
+  cleanup:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
@@ -13,39 +13,12 @@ jobs:
         with:
           ref: agent/v36-6-6-resilience
           fetch-depth: 0
-      - name: Normalize template response shape
+      - name: Remove temporary helpers
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          p=Path('index.html');s=p.read_text(encoding='utf-8')
-          old="reqId=data&&data.request_id?data.request_id:reqId;"
-          new="if(data&&data.request_id!=null)reqId=data.request_id;"
-          if s.count(old)!=1: raise SystemExit('template response anchor missing')
-          p.write_text(s.replace(old,new,1),encoding='utf-8')
-          PY
-      - name: Apply guarded frontend patch
-        id: patch
-        shell: bash
-        run: |
-          set +e
-          python .github/scripts/apply_phase4_frontend.py > phase4-frontend-patch.log 2>&1
-          code=$?
-          cat phase4-frontend-patch.log
-          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
-          exit $code
-      - name: Upload patch diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: phase4-frontend-patch-log
-          path: phase4-frontend-patch.log
-          if-no-files-found: error
-      - name: Commit integration
-        if: steps.patch.outputs.exit_code == '0'
-        run: |
+          git rm -f .github/workflows/apply-phase4-frontend.yml
+          git rm -f .github/workflows/fix-phase4-patch-script.yml
+          git rm -f .github/scripts/apply_phase4_frontend.py
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add index.html package.json package-lock.json tests/login-bootstrap.test.mjs
-          git diff --cached --quiet && exit 0
-          git commit -m "feat: integrate v36.6.6 resilient client operations"
+          git commit -m "chore: remove Phase4 temporary helpers"
           git push origin HEAD:agent/v36-6-6-resilience
