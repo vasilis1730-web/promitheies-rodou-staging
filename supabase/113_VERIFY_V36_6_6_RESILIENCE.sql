@@ -17,6 +17,8 @@ legacy_grants as (
   select jsonb_build_object(
     'save_request_legacy_authenticated',has_function_privilege('authenticated','public.save_unit_request_atomic(text,bigint,bigint,integer,text,text,jsonb)','EXECUTE'),
     'lock_study_legacy_authenticated',has_function_privilege('authenticated','public.lock_study_atomic(text,bigint,bigint,integer,text,text,text,jsonb)','EXECUTE'),
+    'save_contract_legacy_authenticated',has_function_privilege('authenticated','public.save_contract_atomic(text,text,text,text,text,text,date,date,numeric)','EXECUTE'),
+    'save_contract_pricing_legacy_authenticated',has_function_privilege('authenticated','public.save_contract_pricing_atomic(text,text,text,text,text,text,date,date,numeric,text,numeric,jsonb)','EXECUTE'),
     'save_order_legacy_authenticated',has_function_privilege('authenticated','public.save_order_atomic(text,text,date,text,text,text,numeric,jsonb,boolean)','EXECUTE'),
     'excel_import_legacy_authenticated',has_function_privilege('authenticated','public.secure_import_catalog_request_atomic(uuid,text,bigint,bigint,integer,text,jsonb,jsonb,jsonb)','EXECUTE')
   ) j
