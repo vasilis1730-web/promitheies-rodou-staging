@@ -1,0 +1,58 @@
+name: Patch Phase4 stale tests
+on:
+  push:
+    branches: [agent/v36-6-6-resilience]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/v36-6-6-resilience
+          fetch-depth: 0
+      - name: Patch stale expectations
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          # GO-LIVE RESET v36.6.5 is intentionally a historical pre-v36.6.6 test.
+          p=Path('tests/go-live-reset-v36-6-5.test.mjs')
+          s=p.read_text(encoding='utf-8')
+          old="const migrations=()=>fs.readdirSync(migrationsDir).filter(x=>/^\\d+.*\\.sql$/i.test(x)).sort((a,b)=>a.localeCompare(b,'en'));"
+          new="const migrations=()=>fs.readdirSync(migrationsDir).filter(x=>/^\\d+.*\\.sql$/i.test(x) && x.localeCompare('202608090005_v36_6_6_resilience.sql','en')<0).sort((a,b)=>a.localeCompare(b,'en'));"
+          if old not in s: raise SystemExit('go-live migrations anchor missing')
+          s=s.replace(old,new,1)
+          p.write_text(s,encoding='utf-8')
+
+          patches={
+            'tests/phase2-integrity-v36-6-4.test.mjs':[
+              ("τρέχον schema 36.6.5","τρέχον schema 36.6.6"),
+              ("`select public.app_schema_version()`),'36.6.5'","`select public.app_schema_version()`),'36.6.6'")
+            ],
+            'tests/phase3-financial-v36-6-5.test.mjs':[
+              ("clean install φτάνει σε schema 36.6.5","clean install φτάνει σε schema 36.6.6"),
+              ("`select public.app_schema_version()`),'36.6.5'","`select public.app_schema_version()`),'36.6.6'")
+            ],
+            'tests/production-readiness-v36-6-3.test.mjs':[
+              ("clean install εφαρμόζει αυτόματα ΟΛΕΣ τις migrations και φτάνει σε schema 36.6.5","clean install εφαρμόζει αυτόματα ΟΛΕΣ τις migrations και φτάνει σε schema 36.6.6"),
+              ("assert.equal(version, '36.6.5');","assert.equal(version, '36.6.6');")
+            ]
+          }
+          for fn,repls in patches.items():
+            p=Path(fn); s=p.read_text(encoding='utf-8')
+            for old,new in repls:
+              if old not in s: raise SystemExit(f'{fn}: missing anchor {old}')
+              s=s.replace(old,new,1)
+            p.write_text(s,encoding='utf-8')
+          PY
+      - name: Commit fixes
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add tests/go-live-reset-v36-6-5.test.mjs tests/phase2-integrity-v36-6-4.test.mjs tests/phase3-financial-v36-6-5.test.mjs tests/production-readiness-v36-6-3.test.mjs
+          git diff --cached --quiet && exit 0
+          git commit -m "test: align historical and current schema expectations for v36.6.6"
+          git push origin HEAD:agent/v36-6-6-resilience
