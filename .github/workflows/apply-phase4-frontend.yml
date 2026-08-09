@@ -13,6 +13,16 @@ jobs:
         with:
           ref: agent/v36-6-6-resilience
           fetch-depth: 0
+      - name: Normalize template response shape
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('index.html');s=p.read_text(encoding='utf-8')
+          old="reqId=data&&data.request_id?data.request_id:reqId;"
+          new="if(data&&data.request_id!=null)reqId=data.request_id;"
+          if s.count(old)!=1: raise SystemExit('template response anchor missing')
+          p.write_text(s.replace(old,new,1),encoding='utf-8')
+          PY
       - name: Apply guarded frontend patch
         id: patch
         shell: bash
