@@ -24,6 +24,7 @@ const requiredRpcs = [
   'amend_locked_study_atomic',
   'cancel_locked_study_atomic',
   'save_contract_atomic',
+  'save_contract_pricing_atomic',
   'save_order_atomic',
   'transition_order_status_atomic',
   'delete_order_draft_atomic',
@@ -36,9 +37,9 @@ const requiredRpcs = [
   'get_contract_balance_atomic'
 ];
 
-test('το frontend v36.6.4 χρησιμοποιεί διαχείριση μελετών, σταθερές ομάδες, ατομικές ροές και ασφαλή HTML sinks', () => {
-  assert.match(source, /Προμήθειες &amp; Υπηρεσίες v36\.6\.4 PHASE 2 INTEGRITY/);
-  assert.match(source, /const APP_VERSION='v36\.6\.4-phase2-integrity', REQUIRED_SCHEMA_VERSION='36\.6\.4'/);
+test('το frontend v36.6.5 χρησιμοποιεί πραγματικές συμβατικές τιμές, ατομικές ροές και ασφαλή HTML sinks', () => {
+  assert.match(source, /Προμήθειες &amp; Υπηρεσίες v36\.6\.5 CONTRACT PRICING/);
+  assert.match(source, /const APP_VERSION='v36\.6\.5-contract-pricing', REQUIRED_SCHEMA_VERSION='36\.6\.5'/);
   assert.match(source, /Ιαλυσού – Καλλιθέας – Αφάντου/);
   assert.match(source, /Λίνδου – Νότιας Ρόδου – Αρχαγγέλου/);
   assert.match(source, /Πεταλουδών – Καμείρου – Ατταβύρου/);
@@ -69,6 +70,10 @@ test('το frontend v36.6.4 χρησιμοποιεί διαχείριση μελ
   assert.match(source, /function assertSafeExcelFile/);
   assert.match(source, /function assertSafeXlsxEnvelope/);
   assert.match(source, /p_import_token:importContext\.exportToken/);
+  assert.match(source, /Οικονομική προσφορά \/ συμβατικές τιμές/);
+  assert.match(source, /Συμβατική καθαρή αξία/);
+  assert.match(source, /Math\.abs\(cov-c\)>0\.005/);
+  assert.match(source, /p_pricing_mode:mode/);
   assert.doesNotMatch(source, /function isIntegerQuantityMaterial\(\)\{return true;\}/);
   assert.doesNotMatch(source, /const byId=\(arr,id\)=>\(arr\|\|\[\]\)\.find\(x=>x\.id===id\)/);
   assert.doesNotMatch(source, /SUPERVISOR_EMAILS/);
