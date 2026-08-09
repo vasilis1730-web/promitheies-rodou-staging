@@ -16,20 +16,19 @@ const criticalTables = [
 ];
 
 const requiredRpcs = [
-  'save_unit_request_atomic',
-  'copy_unit_request_atomic',
+  'save_unit_request_resilient_atomic',
+  'copy_unit_request_resilient_atomic',
   'issue_excel_export_token',
-  'secure_import_catalog_request_atomic',
-  'lock_study_atomic',
+  'secure_import_catalog_request_resilient_atomic',
+  'lock_study_resilient_atomic',
   'amend_locked_study_atomic',
   'cancel_locked_study_atomic',
-  'save_contract_atomic',
-  'save_contract_pricing_atomic',
-  'save_order_atomic',
+  'save_contract_pricing_resilient_atomic',
+  'save_order_resilient_atomic',
   'transition_order_status_atomic',
   'delete_order_draft_atomic',
   'save_locked_study_as_template_atomic',
-  'load_study_template_atomic',
+  'load_study_template_resilient_atomic',
   'delete_study_template_atomic',
   'admin_purge_locked_study_atomic',
   'admin_set_app_permissions',
@@ -37,9 +36,9 @@ const requiredRpcs = [
   'get_contract_balance_atomic'
 ];
 
-test('το frontend v36.6.5 χρησιμοποιεί πραγματικές συμβατικές τιμές, ατομικές ροές και ασφαλή HTML sinks', () => {
-  assert.match(source, /Προμήθειες &amp; Υπηρεσίες v36\.6\.5 CONTRACT PRICING/);
-  assert.match(source, /const APP_VERSION='v36\.6\.5-contract-pricing', REQUIRED_SCHEMA_VERSION='36\.6\.5'/);
+test('το frontend v36.6.6 χρησιμοποιεί πραγματικές συμβατικές τιμές, ατομικές ροές και ασφαλή HTML sinks', () => {
+  assert.match(source, /Προμήθειες &amp; Υπηρεσίες v36\.6\.6 PRODUCTION RESILIENCE/);
+  assert.match(source, /const APP_VERSION='v36\.6\.6-production-resilience', REQUIRED_SCHEMA_VERSION='36\.6\.6'/);
   assert.match(source, /Ιαλυσού – Καλλιθέας – Αφάντου/);
   assert.match(source, /Λίνδου – Νότιας Ρόδου – Αρχαγγέλου/);
   assert.match(source, /Πεταλουδών – Καμείρου – Ατταβύρου/);
