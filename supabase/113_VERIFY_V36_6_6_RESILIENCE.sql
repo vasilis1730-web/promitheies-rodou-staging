@@ -10,7 +10,9 @@ wrappers as (
     'lock_study_resilient',to_regprocedure('public.lock_study_resilient_atomic(uuid,bigint,text,bigint,bigint,integer,text,text,text,jsonb)') is not null,
     'contract_pricing_resilient',to_regprocedure('public.save_contract_pricing_resilient_atomic(uuid,text,text,text,text,text,text,date,date,numeric,text,numeric,jsonb)') is not null,
     'order_resilient',to_regprocedure('public.save_order_resilient_atomic(uuid,text,text,date,text,text,text,numeric,jsonb,boolean)') is not null,
-    'excel_import_resilient',to_regprocedure('public.secure_import_catalog_request_resilient_atomic(uuid,bigint,uuid,text,bigint,bigint,integer,text,jsonb,jsonb,jsonb)') is not null
+    'excel_import_resilient',to_regprocedure('public.secure_import_catalog_request_resilient_atomic(uuid,bigint,uuid,text,bigint,bigint,integer,text,jsonb,jsonb,jsonb)') is not null,
+    'copy_request_resilient',to_regprocedure('public.copy_unit_request_resilient_atomic(uuid,bigint,bigint,bigint,bigint,integer,text,jsonb)') is not null,
+    'load_template_resilient',to_regprocedure('public.load_study_template_resilient_atomic(uuid,bigint,text,bigint,bigint,integer)') is not null
   ) j
 ),
 legacy_grants as (
@@ -20,7 +22,9 @@ legacy_grants as (
     'save_contract_legacy_authenticated',has_function_privilege('authenticated','public.save_contract_atomic(text,text,text,text,text,text,date,date,numeric)','EXECUTE'),
     'save_contract_pricing_legacy_authenticated',has_function_privilege('authenticated','public.save_contract_pricing_atomic(text,text,text,text,text,text,date,date,numeric,text,numeric,jsonb)','EXECUTE'),
     'save_order_legacy_authenticated',has_function_privilege('authenticated','public.save_order_atomic(text,text,date,text,text,text,numeric,jsonb,boolean)','EXECUTE'),
-    'excel_import_legacy_authenticated',has_function_privilege('authenticated','public.secure_import_catalog_request_atomic(uuid,text,bigint,bigint,integer,text,jsonb,jsonb,jsonb)','EXECUTE')
+    'excel_import_legacy_authenticated',has_function_privilege('authenticated','public.secure_import_catalog_request_atomic(uuid,text,bigint,bigint,integer,text,jsonb,jsonb,jsonb)','EXECUTE'),
+    'copy_request_legacy_authenticated',has_function_privilege('authenticated','public.copy_unit_request_atomic(bigint,bigint,bigint,integer,text,jsonb)','EXECUTE'),
+    'load_template_legacy_authenticated',has_function_privilege('authenticated','public.load_study_template_atomic(text,bigint,bigint,integer)','EXECUTE')
   ) j
 ),
 idempotency as (
