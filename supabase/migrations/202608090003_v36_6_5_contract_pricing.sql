@@ -236,7 +236,7 @@ begin
     p_contract_id,p_study_id,p_supplier_id,p_title,p_adam,p_protocol_no,
     p_start_date,p_end_date,p_vat_rate
   );
-  v_contract_id := (v_base->>'contract_id')::public.mo_contracts.id%type;
+  v_contract_id := v_base->>'contract_id';
 
   select * into v_study
   from public.locked_studies s
