@@ -85,7 +85,7 @@ async function openApp() {
         },
         from: table => queryBuilder(datasets, table, queryLog),
         rpc: async name => name === 'app_schema_version'
-          ? { data: '36.6.3', error: null }
+          ? { data: '36.6.4', error: null }
           : { data: null, error: null }
       }) };
       window.ExcelJS = ExcelJS;
