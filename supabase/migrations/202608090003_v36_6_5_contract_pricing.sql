@@ -20,6 +20,29 @@ alter table public.mo_contracts
 alter table public.mo_contract_items
   add column if not exists estimated_unit_price numeric(14,4);
 
+-- Upgrade backfill: προσωρινή απενεργοποίηση ΜΟΝΟ των υφιστάμενων
+-- immutable row-triggers, αποκλειστικά για αρχικοποίηση των νέων πεδίων.
+-- Η DDL είναι transaction-safe: οποιοδήποτε μεταγενέστερο σφάλμα κάνει
+-- rollback και στην κατάσταση των triggers.
+do $$
+begin
+  if exists (
+    select 1 from pg_trigger t
+    where t.tgrelid='public.mo_contracts'::regclass
+      and t.tgname='trg_mo_contracts_immutable' and not t.tgisinternal
+  ) then
+    alter table public.mo_contracts disable trigger trg_mo_contracts_immutable;
+  end if;
+  if exists (
+    select 1 from pg_trigger t
+    where t.tgrelid='public.mo_contract_items'::regclass
+      and t.tgname='trg_mo_contract_items_immutable' and not t.tgisinternal
+  ) then
+    alter table public.mo_contract_items disable trigger trg_mo_contract_items_immutable;
+  end if;
+end;
+$$;
+
 update public.mo_contracts c
 set estimated_amount = coalesce(c.estimated_amount, s.net_total, c.total_amount),
     pricing_mode = coalesce(nullif(c.pricing_mode,''), 'study'),
@@ -37,6 +60,26 @@ where estimated_amount is null or pricing_mode is null or discount_pct is null;
 update public.mo_contract_items
 set estimated_unit_price = coalesce(estimated_unit_price,unit_price,0)
 where estimated_unit_price is null;
+
+-- Οι immutable guards επανενεργοποιούνται πριν από constraints/RPCs.
+do $$
+begin
+  if exists (
+    select 1 from pg_trigger t
+    where t.tgrelid='public.mo_contracts'::regclass
+      and t.tgname='trg_mo_contracts_immutable' and not t.tgisinternal
+  ) then
+    alter table public.mo_contracts enable trigger trg_mo_contracts_immutable;
+  end if;
+  if exists (
+    select 1 from pg_trigger t
+    where t.tgrelid='public.mo_contract_items'::regclass
+      and t.tgname='trg_mo_contract_items_immutable' and not t.tgisinternal
+  ) then
+    alter table public.mo_contract_items enable trigger trg_mo_contract_items_immutable;
+  end if;
+end;
+$$;
 
 alter table public.mo_contracts
   alter column estimated_amount drop default,
