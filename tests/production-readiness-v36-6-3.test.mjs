@@ -76,7 +76,7 @@ async function installAll() {
   return db;
 }
 
-test('clean install εφαρμόζει αυτόματα ΟΛΕΣ τις migrations και φτάνει σε schema 36.6.5', async () => {
+test('clean install εφαρμόζει αυτόματα ΟΛΕΣ τις migrations και φτάνει σε schema 36.6.6', async () => {
   const db = await installAll();
   try {
     const migrations = allMigrationFiles();
@@ -88,7 +88,7 @@ test('clean install εφαρμόζει αυτόματα ΟΛΕΣ τις migratio
     assert.ok(migrations.includes('202608090002_v36_6_4_request_line_integrity_and_version.sql'));
     assert.ok(migrations.includes('202608090003_v36_6_5_contract_pricing.sql'));
 
-    assert.equal(await scalar(db, `select public.app_schema_version()`), '36.6.5');
+    assert.equal(await scalar(db, `select public.app_schema_version()`), '36.6.6');
     assert.equal(await scalar(db,
       `select to_regprocedure('public.apply_technical_specs_import()') is not null`), true);
     assert.equal(await scalar(db,
