@@ -1,0 +1,41 @@
+name: Export Phase4 SQL
+on:
+  push:
+    branches: [agent/v36-6-6-resilience]
+permissions:
+  contents: write
+jobs:
+  export:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/v36-6-6-resilience
+          fetch-depth: 0
+      - name: Build exact staging package
+        run: |
+          mkdir -p phase4-sql
+          cat \
+            supabase/migrations/202608090005_v36_6_6_resilience.sql \
+            supabase/migrations/202608090006_v36_6_6_contract_entrypoint_hardening.sql \
+            supabase/migrations/202608090007_v36_6_6_aux_request_resilience.sql \
+            > phase4-sql/01_APPLY_V36_6_6.sql
+          cp supabase/113_VERIFY_V36_6_6_RESILIENCE.sql phase4-sql/02_VERIFY_V36_6_6_RESILIENCE.sql
+          cp docs/PHASE4_DISASTER_RECOVERY.md phase4-sql/PHASE4_DISASTER_RECOVERY.md
+          cp docs/PHASE4_RESILIENCE_VERIFICATION.md phase4-sql/PHASE4_RESILIENCE_VERIFICATION.md
+          (cd phase4-sql && sha256sum 01_APPLY_V36_6_6.sql 02_VERIFY_V36_6_6_RESILIENCE.sql > SHA256SUMS.txt)
+          printf 'source_commit=%s\n' "$GITHUB_SHA" > phase4-sql/SOURCE_COMMIT.txt
+      - name: Upload exact SQL package
+        uses: actions/upload-artifact@v4
+        with:
+          name: PROMITHEIES_RODOU_V36_6_6_PHASE4_SQL
+          path: phase4-sql/
+          if-no-files-found: error
+      - name: Remove temporary export workflow
+        run: |
+          git rm .github/workflows/export-phase4-sql.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m "chore: remove Phase4 SQL export helper"
+          git push origin HEAD:agent/v36-6-6-resilience
