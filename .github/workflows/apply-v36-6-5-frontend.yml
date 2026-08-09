@@ -1,0 +1,32 @@
+name: Apply v36.6.5 frontend
+on:
+  push:
+    branches: [agent/v36-6-5-contract-pricing]
+    paths: ['.github/workflows/apply-v36-6-5-frontend.yml']
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/v36-6-5-contract-pricing
+      - name: Apply guarded frontend patch
+        run: python scripts/patch_v365_frontend.py
+      - name: Sanity checks
+        shell: bash
+        run: |
+          grep -q 'v36.6.5 CONTRACT PRICING' index.html
+          grep -q "REQUIRED_SCHEMA_VERSION='36.6.5'" index.html
+          grep -q "save_contract_pricing_atomic" index.html
+          grep -q '"version": "36.6.5"' package.json
+      - name: Commit frontend
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html package.json package-lock.json
+          git diff --cached --quiet && exit 0
+          git commit -m "feat: expose awarded contract pricing in assignment flow"
+          git push
