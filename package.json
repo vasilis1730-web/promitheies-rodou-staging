@@ -1,7 +1,7 @@
 {
   "name": "promitheies-rodou",
   "private": true,
-  "version": "36.6.5",
+  "version": "36.6.6",
   "type": "module",
   "scripts": {
     "start": "node local-server.mjs",

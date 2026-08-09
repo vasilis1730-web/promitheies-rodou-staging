@@ -83,10 +83,10 @@ function orderPayload(item,{qty=1,customPrice=null,mapQty=null}={}){
   return JSON.stringify([{contract_item_id:String(item.id),quantity:qty,unit_price:Number(item.unit_price),description:item.description,unit:item.unit}]);
 }
 
-test('clean install φτάνει σε schema 36.6.5 και διαθέτει το νέο pricing RPC/guards',async()=>{
+test('clean install φτάνει σε schema 36.6.6 και διαθέτει το νέο pricing RPC/guards',async()=>{
   const db=await install();
   try{
-    assert.equal(await scalar(db,`select public.app_schema_version()`),'36.6.5');
+    assert.equal(await scalar(db,`select public.app_schema_version()`),'36.6.6');
     assert.equal(await scalar(db,`select to_regprocedure('public.save_contract_pricing_atomic(text,text,text,text,text,text,date,date,numeric,text,numeric,jsonb)') is not null`),true);
     for(const [tableName,triggerName] of [
       ['mo_contracts','trg_mo_contracts_pricing_header_guard'],

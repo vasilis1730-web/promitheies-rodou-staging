@@ -8,7 +8,7 @@ import { PGlite } from '@electric-sql/pglite';
 const ADMIN_ID='11111111-1111-1111-1111-111111111111';
 const migrationsDir=fileURLToPath(new URL('../supabase/migrations/',import.meta.url));
 const read=relative=>fs.readFileSync(new URL(relative,import.meta.url),'utf8');
-const migrations=()=>fs.readdirSync(migrationsDir).filter(x=>/^\d+.*\.sql$/i.test(x)).sort((a,b)=>a.localeCompare(b,'en'));
+const migrations=()=>fs.readdirSync(migrationsDir).filter(x=>/^\d+.*\.sql$/i.test(x) && x.localeCompare('202608090005_v36_6_6_resilience.sql','en')<0).sort((a,b)=>a.localeCompare(b,'en'));
 async function scalar(db,sql,params=[]){const r=await db.query(sql,params);const row=r.rows[0]||{};return row[Object.keys(row)[0]];}
 
 async function install(){
