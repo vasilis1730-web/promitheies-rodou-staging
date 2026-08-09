@@ -62,7 +62,7 @@ async function prepareStudy(db,{qty=10,price=5}={}){
   const {configId,unitId}=await activateGroups(db);
   const groupId=await scalar(db,`select id from public.procurement_groups where domain='procurement' order by id limit 1`);
   const materialId=await scalar(db,`select id from public.materials where group_id=$1 and is_active order by id limit 1`,[groupId]);
-  const lock=await scalar(db,`select public.lock_study_atomic(null,$1,$2,2026,'Phase3',null,null,jsonb_build_array(jsonb_build_object('material_id',$3::text,'quantity',$4,'unit_price',$5,'comments',null)))`,[unitId,groupId,materialId,qty,price]);
+  const lock=await scalar(db,`select public.lock_study_atomic(null,$1,$2,2026,'Phase3',null,null,jsonb_build_array(jsonb_build_object('material_id',$3::text,'quantity',$4::numeric,'unit_price',$5::numeric,'comments',null)))`,[unitId,groupId,materialId,qty,price]);
   const supplierId=await scalar(db,`insert into public.mo_suppliers(name,created_by) values('Supplier',$1) returning id`,[ADMIN_ID]);
   const receiverId=await scalar(db,`insert into public.mo_receivers(name,created_by) values('Receiver',$1) returning id`,[ADMIN_ID]);
   return {configId,unitId,groupId,materialId,lock,supplierId,receiverId,studyNet:qty*price};
