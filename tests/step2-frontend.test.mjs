@@ -15,20 +15,23 @@ const criticalTables = [
   'mo_order_items'
 ];
 
-const requiredRpcs = [
+const resilientRpcs = [
   'save_unit_request_resilient_atomic',
   'copy_unit_request_resilient_atomic',
-  'issue_excel_export_token',
   'secure_import_catalog_request_resilient_atomic',
   'lock_study_resilient_atomic',
-  'amend_locked_study_atomic',
-  'cancel_locked_study_atomic',
   'save_contract_pricing_resilient_atomic',
   'save_order_resilient_atomic',
+  'load_study_template_resilient_atomic'
+];
+
+const directRpcs = [
+  'issue_excel_export_token',
+  'amend_locked_study_atomic',
+  'cancel_locked_study_atomic',
   'transition_order_status_atomic',
   'delete_order_draft_atomic',
   'save_locked_study_as_template_atomic',
-  'load_study_template_resilient_atomic',
   'delete_study_template_atomic',
   'admin_purge_locked_study_atomic',
   'admin_set_app_permissions',
@@ -81,7 +84,10 @@ test('το frontend v36.6.6 χρησιμοποιεί πραγματικές συ
   assert.doesNotMatch(source, /xlsx@0\.18\.5|window\.XLSX|\bXLSX\./);
   assert.doesNotMatch(source, /document\.write\((?!sanitizeDocumentHtml)/);
 
-  for (const rpc of requiredRpcs) {
+  for (const rpc of resilientRpcs) {
+    assert.match(source, new RegExp(`resilientRpc\\(['\"]${rpc}['\"]`), `λείπει η resilient RPC ${rpc}`);
+  }
+  for (const rpc of directRpcs) {
     assert.match(source, new RegExp(`rpc\\(['\"]${rpc}['\"]`), `λείπει η RPC ${rpc}`);
   }
 
