@@ -104,10 +104,10 @@ async function prepareContract(db){
   return {unitId,groupId,materialId,lock,contract,supplierId,receiverId,items};
 }
 
-test('clean install φτάνει σε schema 36.6.4 με τα νέα integrity triggers ενεργά',async()=>{
+test('clean install διατηρεί τα Phase-2 integrity triggers ενεργά στο τρέχον schema 36.6.5',async()=>{
   const db=await install();
   try{
-    assert.equal(await scalar(db,`select public.app_schema_version()`),'36.6.4');
+    assert.equal(await scalar(db,`select public.app_schema_version()`),'36.6.5');
     for(const [tableName,triggerName] of [
       ['mo_orders','trg_mo_orders_contract_integrity'],
       ['locked_studies','trg_locked_studies_contract_cancel_guard'],

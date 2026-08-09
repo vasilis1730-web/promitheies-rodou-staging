@@ -112,7 +112,7 @@ test('αν λείπει η τοπική βιβλιοθήκη σύνδεσης τ
 test('το πακέτο περιλαμβάνει σαφή τοπική εκκίνηση και δεν χαλαρώνει τον έλεγχο σχήματος', () => {
   assert.match(source, /location\.protocol==='file:'/);
   assert.match(source, /start-local\.bat/);
-  assert.match(source, /REQUIRED_SCHEMA_VERSION='36\.6\.4'/);
+  assert.match(source, /REQUIRED_SCHEMA_VERSION='36\.6\.5'/);
   assert.match(source, /permissions_schema_missing/);
   assert.match(source, /schema_check_missing/);
   assert.match(source, /schema_mismatch/);
