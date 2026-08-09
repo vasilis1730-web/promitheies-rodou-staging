@@ -14,8 +14,24 @@ jobs:
           ref: agent/v36-6-6-resilience
           fetch-depth: 0
       - name: Apply guarded frontend patch
-        run: python .github/scripts/apply_phase4_frontend.py
+        id: patch
+        shell: bash
+        run: |
+          set +e
+          python .github/scripts/apply_phase4_frontend.py > phase4-frontend-patch.log 2>&1
+          code=$?
+          cat phase4-frontend-patch.log
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit $code
+      - name: Upload patch diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase4-frontend-patch-log
+          path: phase4-frontend-patch.log
+          if-no-files-found: error
       - name: Commit integration
+        if: steps.patch.outputs.exit_code == '0'
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
