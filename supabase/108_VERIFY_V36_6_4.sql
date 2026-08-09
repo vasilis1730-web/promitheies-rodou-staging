@@ -6,24 +6,28 @@
 with
 rpc_checks as (
   select
-    coalesce((
-      select position('app_is_admin' in lower(p.prosrc)) > 0
-      from pg_proc p join pg_namespace n on n.oid=p.pronamespace
-      where n.nspname='public'
-        and p.proname='import_catalog_request_atomic'
-        and pg_get_function_identity_arguments(p.oid)='text, bigint, bigint, integer, text, jsonb, jsonb, jsonb'
-      limit 1
-    ),false) as legacy_import_catalog_admin_guard_present,
+    coalesce(
+      position(
+        'app_is_admin' in lower(
+          pg_get_functiondef(
+            to_regprocedure('public.import_catalog_request_atomic(text,bigint,bigint,integer,text,jsonb,jsonb,jsonb)')
+          )
+        )
+      ) > 0,
+      false
+    ) as legacy_import_catalog_admin_guard_present,
     to_regprocedure('public.secure_import_catalog_request_atomic(uuid,text,bigint,bigint,integer,text,jsonb,jsonb,jsonb)') is not null
       as secure_import_rpc_exists,
-    coalesce((
-      select position('is_active' in lower(p.prosrc)) > 0
-      from pg_proc p join pg_namespace n on n.oid=p.pronamespace
-      where n.nspname='public'
-        and p.proname='app_validate_request_lines'
-        and pg_get_function_identity_arguments(p.oid)='bigint, jsonb'
-      limit 1
-    ),false) as request_validator_checks_active_catalog_item
+    coalesce(
+      position(
+        'm.is_active is true' in lower(
+          pg_get_functiondef(
+            to_regprocedure('public.app_validate_request_lines(bigint,jsonb)')
+          )
+        )
+      ) > 0,
+      false
+    ) as request_validator_checks_active_catalog_item
 ),
 triggers as (
   select
@@ -85,10 +89,18 @@ catalog as (
 ),
 authz as (
   select
-    coalesce((select position('is_active' in lower(p.prosrc))>0 from pg_proc p join pg_namespace n on n.oid=p.pronamespace
-      where n.nspname='public' and p.proname='app_current_role' and pg_get_function_identity_arguments(p.oid)='' limit 1),false) as current_role_checks_active,
-    coalesce((select position('is_active' in lower(p.prosrc))>0 from pg_proc p join pg_namespace n on n.oid=p.pronamespace
-      where n.nspname='public' and p.proname='app_current_unit_id' and pg_get_function_identity_arguments(p.oid)='' limit 1),false) as current_unit_checks_active
+    coalesce(
+      position(
+        'is_active' in lower(pg_get_functiondef(to_regprocedure('public.app_current_role()')))
+      ) > 0,
+      false
+    ) as current_role_checks_active,
+    coalesce(
+      position(
+        'is_active' in lower(pg_get_functiondef(to_regprocedure('public.app_current_unit_id()')))
+      ) > 0,
+      false
+    ) as current_unit_checks_active
 )
 select jsonb_pretty(jsonb_build_object(
   'verified_at',now(),
