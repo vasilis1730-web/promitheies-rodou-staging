@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self';script-src 'self' file: 'sha256-NLpLpNcz/YNRtPjxWZxYhJhG/C9dgIDbxNMbQT8EKjY=' 'sha256-waCoTaq02JY4DY56C4JBtCoiAEMnJ7s32Ps6tHiLhcQ='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; connect-src https://omncqldgtkdcjpqfwwlr.supabase.co wss://omncqldgtkdcjpqfwwlr.supabase.co https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self';script-src 'self' file: 'sha256-NLpLpNcz/YNRtPjxWZxYhJhG/C9dgIDbxNMbQT8EKjY=' 'sha256-tsxik7FssTU9SsQJSLXYnUiPV9lJiYb+BstFWHXbsI0='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; connect-src https://omncqldgtkdcjpqfwwlr.supabase.co wss://omncqldgtkdcjpqfwwlr.supabase.co https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'">
 <title>Δήμος Ρόδου · Προμήθειες &amp; Υπηρεσίες v36.6.6 PRODUCTION RESILIENCE</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3966,6 +3966,9 @@ function parseBooleanCell(v){
 }
 function normHeader(s){return norm((''+(s||'')).replace(/\s+/g,' ').trim());}
 function normSheetName(s){return normHeader(s).replace(/[_-]+/g,' ').replace(/\s+/g,' ').trim();}
+// Τα αναγνωριστικά ειδών είναι UUID στη βάση. Οι ακέραιοι γίνονται δεκτοί για
+// συμβατότητα με παλαιότερες εξαγωγές που είχαν αριθμητικά κλειδιά.
+const MATERIAL_ID_RE=/^(?:\d{1,20}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
 const EXCEL_IMPORT_LIMITS=Object.freeze({
   maxBytes:8*1024*1024,maxSheets:4,maxCatalogRows:5000,maxSheetRows:6000,
   maxColumns:16,maxCells:100000,maxCellChars:12000
@@ -4142,7 +4145,7 @@ async function readWorkbookRows(file){
   for(const [offset,r] of kr.slice(1).entries()){
     if(!r||r.every(c=>cellText(c)===''))continue;
     const ordinalText=cellText(r[0]),materialId=cellText(r[1]),groupId=cellText(r[3]);
-    if(!/^\d{1,6}$/.test(ordinalText)||!/^\d{1,20}$/.test(materialId)||groupId!==String(cur.groupId)){
+    if(!/^\d{1,6}$/.test(ordinalText)||!MATERIAL_ID_RE.test(materialId)||groupId!==String(cur.groupId)){
       throw new Error('Μη έγκυρη γραμμή '+(offset+2)+' στο φύλλο «ΚΛΕΙΔΙΑ_ΕΙΔΩΝ».');
     }
     const ordinal=Number(ordinalText);
@@ -4158,6 +4161,17 @@ async function readWorkbookRows(file){
   return {rows,metadata,keyMap,sheetName:preferred,formulaCells:inspected[preferred].formulas};
 }
 
+// Οι τίτλοι υποκατηγορίας γράφονται από την εξαγωγή ως συγχωνευμένα κελιά A:L.
+// Κατά την ανάγνωση το ίδιο κείμενο επιστρέφεται σε ΟΛΕΣ τις στήλες, οπότε χωρίς
+// αυτόν τον έλεγχο ο τίτλος θα κατέληγε στα πεδία «Α/Α» και «CE» και θα ακύρωνε
+// την εισαγωγή. Γραμμή-τίτλος = κάθε μη κενό κελί έχει το ίδιο, μη αριθμητικό κείμενο.
+function isSectionBannerRow(row){
+  const values=(row||[]).map(cellText).filter(v=>v!=='');
+  if(values.length<2)return false;
+  const first=values[0];
+  if(/^[+-]?(?:\d+(?:[.,]\d+)?|[.,]\d+)$/.test(first))return false;
+  return values.every(v=>v===first);
+}
 function rowObject(headers,row){
   const o={}; headers.forEach((h,i)=>o[h]=row[i]); return o;
 }
@@ -4299,6 +4313,7 @@ async function importQuantitiesFromFile(file){
   const parsed=[];
   rows.slice(headerIndex+1).forEach((r,i)=>{
     if(!r||r.every(c=>cellText(c)===''))return;
+    if(isSectionBannerRow(r))return;
     const pr=parseImportRow(rowObject(headers,r),headerIndex+i+2);
     if(!pr.id&&!pr.name)return;
     if(norm(pr.name).startsWith('ομαδα ')&&!pr.unit)return;
