@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { inspect } from '../tools/set-environment.mjs';
 
 const ROOT=fileURLToPath(new URL('../',import.meta.url));
 const read=p=>fs.readFileSync(path.join(ROOT,p),'utf8');
@@ -30,7 +31,11 @@ test('production frontend stays within static delivery budget',()=>{
   assert.match(html,/base-uri 'none'/);
   assert.match(html,/form-action 'none'/);
   assert.match(html,/frame-src 'none'/);
-  assert.match(html,/connect-src https:\/\/omncqldgtkdcjpqfwwlr\.supabase\.co wss:\/\/omncqldgtkdcjpqfwwlr\.supabase\.co/);
+  // Η CSP δεν καρφώνεται σε συγκεκριμένο project: επαληθεύεται ότι ακολουθεί το SUPABASE_URL,
+  // ώστε η μετάβαση σε παραγωγή να μην μπορεί να αφήσει το connect-src πίσω.
+  const supabaseHost=new URL(html.match(/const SUPABASE_URL='([^']+)'/)[1]).host;
+  assert.match(html,new RegExp(`connect-src https://${supabaseHost} wss://${supabaseHost}`.replaceAll('.','\\.')));
+  assert.deepEqual(inspect(html),[]);
 });
 
 test('repository contains no obvious committed secrets',()=>{
