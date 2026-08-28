@@ -45,8 +45,11 @@
       Κ.Α. 10-6261.0002» (Δ.Ε. Ρόδου, 22 γραμμές, 4.781,16 €) **παραμένει**
       ως πραγματική εργασία, όχι δοκιμαστικό δεδομένο
 - [x] `.nojekyll` στη ρίζα, για το GitHub Pages
-- [ ] `node tools/set-environment.mjs --env production --url <ίδιο> --key <ίδιο>`
-- [ ] Ανάρτηση σε GitHub Pages
+- [x] `APP_ENVIRONMENT='production'` — εφαρμόστηκε 28/08/2026· URL και κλειδί
+      έμειναν ίδια, ξαναϋπολογίστηκε το CSP hash
+- [ ] Ανάρτηση σε GitHub Pages από το `main`, στο repository
+      `vasilis1730-web/promitheies-ypiresies-deltia` →
+      `https://vasilis1730-web.github.io/promitheies-ypiresies-deltia/`
 - [ ] Δοκιμή: είσοδος, κλείδωμα μελέτης, έκδοση δελτίου
 
 Η αλλαγή περιβάλλοντος είναι **μόνο η ένδειξη** `APP_ENVIRONMENT`: το

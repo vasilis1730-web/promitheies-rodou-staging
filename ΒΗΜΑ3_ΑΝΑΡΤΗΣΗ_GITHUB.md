@@ -94,14 +94,14 @@ git init
 git add .
 git commit -m "v36.6.1 — order issue hotfix, installer fix, real-schema tests"
 git branch -M main
-git remote add origin https://github.com/vasilis1730-web/promitheies-rodou.git
+git remote add origin https://github.com/vasilis1730-web/promitheies-ypiresies-deltia.git
 git push -u origin main
 ```
 
 Έπειτα: **Settings → Pages → Source: Deploy from a branch → main / (root)**.
 
 Η σελίδα ζωντανεύει σε 1–2 λεπτά στο
-`https://vasilis1730-web.github.io/promitheies-rodou/`.
+`https://vasilis1730-web.github.io/promitheies-ypiresies-deltia/`.
 
 ---
 
