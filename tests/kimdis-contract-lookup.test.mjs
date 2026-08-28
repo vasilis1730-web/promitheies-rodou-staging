@@ -134,3 +134,60 @@ test('η CSP δεν χρειάστηκε να ανοίξει για το ΚΗΜ�
     'η κλήση περνά από την edge function στον host του Supabase — το connect-src μένει κλειστό');
   assert.match(source, /sb\.functions\.invoke\("kimdis-lookup"/);
 });
+
+test('χαρτογραφεί ΟΛΑ τα μεταδεδομένα που δίνει το ΚΗΜΔΗΣ', () => {
+  const k = kimdisMapContract({
+    ...SYMV,
+    contractType: { key: '2', value: 'Υπηρεσίες' },
+    procedureType: { key: '9', value: 'Απευθείας ανάθεση' },
+    fundingDetails: { publicFundingRef: 'ΣΑΤΑ', publicFundingRefNum: '2026ΣΑΤΑ0001' },
+    decisionRelatedAda: '6ΨΙΞΩ1Ρ-ΑΒΓ',
+    paymentRefNo: ['26PAY015555555', '26PAY015555556']
+  });
+  assert.equal(k.cpv_code, '50413200-5');
+  assert.match(k.cpv_label, /πυρόσβεσης/);
+  assert.equal(k.legal_context, 'ν.4412/2016 - Βιβλίο Ι – κάτω των ορίων');
+  assert.equal(k.contract_type, 'Υπηρεσίες');
+  assert.equal(k.procedure_type, 'Απευθείας ανάθεση');
+  assert.equal(k.signer, 'ΔΗΜΑΡΧΟΣ ΡΟΔΟΥ');
+  assert.equal(k.funding, 'ΣΑΤΑ — 2026ΣΑΤΑ0001');
+  assert.equal(k.ada, '6ΨΙΞΩ1Ρ-ΑΒΓ');
+  assert.equal(k.notice_adam, '25PROC014500000');
+  assert.equal(k.supplier_country, 'Ελλάδα');
+  assert.equal(k.submission_date, '2026-03-11');
+  assert.deepEqual(k.payments, ['26PAY015555555', '26PAY015555556']);
+  assert.equal(k.cancelled, false);
+});
+
+test('εντοπίζει ακυρωμένη πράξη και νεότερη έκδοση', () => {
+  const k = kimdisMapContract({ ...SYMV, cancelled: true, cancellationDate: '2026-05-01T00:00:00', nextRefNo: '26SYMV019999999' });
+  assert.equal(k.cancelled, true);
+  assert.equal(k.cancellation_date, '2026-05-01');
+  assert.equal(k.next_ref, '26SYMV019999999');
+});
+
+test('η ΑΔΑ βρίσκεται και από εναλλακτικά πεδία', () => {
+  assert.equal(kimdisMapContract({ contractRelatedADA: { number1: 'ΨΨΨ-123' } }).ada, 'ΨΨΨ-123');
+  assert.equal(kimdisMapContract({ diavgeiaADA: 'ΩΩΩ-456' }).ada, 'ΩΩΩ-456');
+});
+
+test('οι εντολές πληρωμής είναι πάντα πίνακας', () => {
+  // Οι πίνακες που φτιάχνονται μέσα στο vm context έχουν άλλο prototype, οπότε
+  // ελέγχεται το είδος και το περιεχόμενο, όχι η ταυτότητα του αντικειμένου.
+  for (const raw of [{}, { paymentRefNo: null }, { paymentRefNo: 'όχι πίνακας' }]) {
+    const payments = kimdisMapContract(raw).payments;
+    assert.ok(Array.isArray(payments));
+    assert.equal(payments.length, 0);
+  }
+});
+
+test('η καρτέλα εμφανίζει τα πεδία και η αποθήκευση περνά από ατομικό RPC', () => {
+  for (const label of ['Τίτλος σύμβασης', 'Α/Α ΕΣΗΔΗΣ', 'CPV', 'Αναθέτουσα αρχή',
+                       'Νομικό πλαίσιο', 'Διαδικασία', 'Υπογράφων', 'Χρηματοδότηση',
+                       'ΑΔΑ απόφασης', 'ΑΔΑΜ διακήρυξης', 'Εντολές πληρωμής']) {
+    assert.ok(source.includes('"' + label + '"'), 'λείπει το πεδίο ' + label + ' από την καρτέλα');
+  }
+  assert.match(source, /sb\.rpc\("set_contract_kimdis"/);
+  // Το μήνυμα του server πρέπει να φτάνει στον χρήστη, όχι το γενικό «non-2xx».
+  assert.match(source, /await error\.context\.json\(\)/);
+});
