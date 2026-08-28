@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "start": "node local-server.mjs",
-    "test": "node --test --test-concurrency=1 tests/*.test.mjs"
+    "test": "node --test --test-concurrency=1 tests/*.test.mjs",
+    "env:check": "node tools/set-environment.mjs --check",
+    "env:set": "node tools/set-environment.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.4",
