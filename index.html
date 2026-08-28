@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self';script-src 'self' file: 'sha256-NLpLpNcz/YNRtPjxWZxYhJhG/C9dgIDbxNMbQT8EKjY=' 'sha256-y7YgnDRXTlyczJh5Y096iq59vM8Y6aWqCxhjILpW7HY='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; connect-src https://omncqldgtkdcjpqfwwlr.supabase.co wss://omncqldgtkdcjpqfwwlr.supabase.co https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self';script-src 'self' file: 'sha256-NLpLpNcz/YNRtPjxWZxYhJhG/C9dgIDbxNMbQT8EKjY=' 'sha256-YYflNH4Xw577SvzK0PRqqyJWM7fO4SRp+aGS9KhByxA='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; connect-src https://omncqldgtkdcjpqfwwlr.supabase.co wss://omncqldgtkdcjpqfwwlr.supabase.co https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'">
 <title>Δήμος Ρόδου · Προμήθειες &amp; Υπηρεσίες v36.6.6 PRODUCTION RESILIENCE</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -5919,6 +5919,44 @@ function contractPricingRows(stdy,existing){
     actual_price:num(x.unit_price)
   }));
 }
+/* ---------- άντληση στοιχείων σύμβασης από το ΚΗΜΔΗΣ ----------
+   Το σχήμα της απάντησης είναι επαληθευμένο σε ζωντανή κλήση του Open Data
+   API. Η κλήση περνά από την edge function kimdis-lookup, γιατί το κρατικό
+   API δεν στέλνει CORS headers και η CSP επιτρέπει μόνο τον host του
+   Supabase — όπου ζει και η ίδια η συνάρτηση. */
+const KIMDIS_ADAM_RE=/^\d{2}(REQ|PROC|AWRD|SYMV)\d{9}$/;
+const kimdisAfm=v=>String(v==null?"":v).replace(/\D/g,"");
+function kimdisMapContract(raw){
+  raw=raw||{};
+  const mem=((raw.contractingDataDetails||{}).contractingMembersDataList||[])[0]||{};
+  const od=(raw.objectDetailsList||[])[0]||{};
+  const fin=v=>{if(v==null||v==="")return null;const n=Number(v);return isFinite(n)?n:null;};
+  const vat=fin(od.vat);
+  return {
+    adam:String(raw.referenceNumber||"").trim()||null,
+    title:String(raw.title||"").trim()||null,
+    protocol_no:String(raw.contractNumber||"").trim()||null,
+    signed_date:String(raw.contractSignedDate||"").slice(0,10)||null,
+    supplier_name:String(mem.name||"").trim()||null,
+    supplier_afm:kimdisAfm(mem.vatNumber)||null,
+    net_total:fin(raw.totalCostWithoutVAT),
+    gross_total:fin(raw.totalCostWithVAT),
+    vat_rate:(vat!=null&&vat>=0&&vat<=100)?vat:null,
+    aaht:String(raw.aaht||"").trim()||null,
+    organization:String((raw.organization||{}).value||"").trim()||null
+  };
+}
+/* Η έκπτωση προκύπτει από την καθαρή αξία του ΚΗΜΔΗΣ ως προς την εκτιμώμενη
+   αξία της μελέτης. Πάνω από αυτήν επιστρέφει null: η βάση απορρίπτει τέτοια
+   σύμβαση, οπότε το ποσό μένει χειροκίνητο με προειδοποίηση. */
+function kimdisDiscountPct(net,estimated){
+  if(!(estimated>0)||net==null||!(net>=0))return null;
+  if(net>estimated+0.005)return null;
+  /* Διαφορά μέσα στην ανοχή του μισού λεπτού δίνει οριακά αρνητικό ποσοστό·
+     σημαίνει «καμία έκπτωση» και το πεδίο δέχεται μόνο μη αρνητικές τιμές. */
+  return Math.max(0,Math.round((1-net/estimated)*1000000)/10000);
+}
+
 function assignForm(existing){
   const stdy=st.study,dm=domainOf(stdy);
   const isNew=!existing;
@@ -5991,6 +6029,71 @@ function assignForm(existing){
   priceInputs.forEach(inp=>inp.addEventListener("input",updatePricingUI));
   const vatField=fld("ΦΠΑ %","vat_rate","number",c.vat_rate!=null?c.vat_rate:(num(S.vat)||24),f);
   f.vat_rate.step="0.01";f.vat_rate.min="0";f.vat_rate.max="100";if(existing)f.vat_rate.disabled=true;
+  const adamField=fld("ΑΔΑΜ","adam","text",c.adam,f,"π.χ. 25SYMV017115178");
+  const kimdisBtn=el("button",{class:"mo-btn mo-sm",type:"button"},"🔎 Άντληση από ΚΗΜΔΗΣ");
+  adamField.append(el("div",{style:"margin-top:6px"},kimdisBtn));
+  const adamRow=row2(adamField,fld("Αρ. πρωτοκόλλου","protocol_no","text",c.protocol_no,f));
+  const kimdisPanel=el("div",{class:"mo-card mo-pad",style:"display:none;margin:8px 0;background:#F8FBFE"});
+  /* Κανένα πεδίο δεν αντικαθίσταται σιωπηλά: συμπληρώνονται μόνο τα κενά και
+     κάθε διαφορά αναφέρεται, ώστε να μη χαθεί διόρθωση που έγινε ήδη. */
+  function kimdisApply(k){
+    const filled=[],kept=[],warn=[];
+    const put=(input,label,value)=>{
+      if(!input||value==null||value==="")return;
+      const cur=String(input.value||"").trim(),nv=String(value).trim();
+      if(!cur){input.value=nv;filled.push(label+": "+nv);}
+      else if(cur!==nv)kept.push(label+": κρατήθηκε «"+cur+"» — το ΚΗΜΔΗΣ γράφει «"+nv+"»");
+    };
+    put(f.adam,"ΑΔΑΜ",k.adam);
+    put(f.protocol_no,"Αρ. πρωτοκόλλου",k.protocol_no);
+    put(f.start_date,"Έναρξη",k.signed_date);
+    if(k.vat_rate!=null&&!existing)put(f.vat_rate,"ΦΠΑ %",k.vat_rate);
+    if(k.supplier_afm){
+      const hit=st.suppliers.filter(x=>x.active!==false).find(x=>kimdisAfm(x.afm)===k.supplier_afm);
+      if(hit){
+        if(!supSel.value){supSel.value=hit.id;filled.push("Ανάδοχος: "+hit.name+" (ΑΦΜ "+k.supplier_afm+")");}
+        else if(!sameId(supSel.value,hit.id))kept.push("Ανάδοχος: κρατήθηκε η επιλογή σας — το ΚΗΜΔΗΣ δείχνει «"+hit.name+"»");
+      }else{
+        warn.push("Δεν υπάρχει καταχωρισμένος ανάδοχος με ΑΦΜ "+k.supplier_afm+(k.supplier_name?(" («"+k.supplier_name+"»)"):"")+". Δημιουργήστε τον με «＋ Νέος».");
+      }
+    }
+    if(k.net_total!=null){
+      const est=num(stdy.net_total),d=kimdisDiscountPct(k.net_total,est);
+      if(d==null){
+        warn.push("Το ΚΗΜΔΗΣ δίνει καθαρή αξία "+eur(k.net_total)+", μεγαλύτερη από την εκτιμώμενη αξία της μελέτης "+eur(est)+". Το ποσό ΔΕΝ εφαρμόστηκε — συμπληρώστε το χειροκίνητα.");
+      }else if(existing){
+        kept.push("Καθαρή αξία ΚΗΜΔΗΣ "+eur(k.net_total)+": οι κατακυρωμένες τιμές υφιστάμενης σύμβασης δεν μεταβάλλονται.");
+      }else{
+        modeSel.value="discount";discountInp.value=d;updatePricingUI();
+        filled.push("Συμβατική καθαρή αξία: "+eur(k.net_total)+" → ενιαία έκπτωση "+qy(d)+"%");
+      }
+    }
+    kimdisPanel.innerHTML="";
+    const sect=(title,items,color)=>items.length?el("div",{style:"margin-top:6px"},
+      el("b",{style:color?("color:"+color):null},title),
+      el("ul",{style:"margin:4px 0 0 18px;padding:0;font-size:12px"},items.map(t=>el("li",{},t)))):null;
+    kimdisPanel.append(
+      el("div",{class:"mo-muted",style:"font-size:12px"},"Στοιχεία ΚΗΜΔΗΣ"+(k.title?(" · "+k.title):"")+(k.aaht?(" · Α/Α ΕΣΗΔΗΣ "+k.aaht):"")),
+      sect("Συμπληρώθηκαν",filled,"var(--mo-ok)"),
+      sect("Δεν αντικαταστάθηκαν",kept,null),
+      sect("Προσοχή",warn,"var(--mo-err)"));
+    kimdisPanel.style.display="";
+    if(!filled.length&&!kept.length&&!warn.length)T("Το ΚΗΜΔΗΣ δεν επέστρεψε αξιοποιήσιμα στοιχεία.","warn");
+  }
+  async function kimdisFetch(){
+    const adam=String((f.adam&&f.adam.value)||"").trim().toUpperCase().replace(/\s+/g,"");
+    if(!KIMDIS_ADAM_RE.test(adam)){T("Συμπληρώστε έγκυρο ΑΔΑΜ, π.χ. 25SYMV017115178.","warn");return;}
+    if(f.adam)f.adam.value=adam;
+    kimdisBtn.disabled=true;const lbl=kimdisBtn.textContent;kimdisBtn.textContent="Άντληση…";
+    try{
+      const {data,error}=await sb.functions.invoke("kimdis-lookup",{body:{q:adam}});
+      if(error)throw error;
+      if(!data||!data.ok)throw new Error((data&&data.error)||"Το ΚΗΜΔΗΣ δεν επέστρεψε εγγραφή.");
+      kimdisApply(kimdisMapContract(data.raw));
+    }catch(e){T("ΚΗΜΔΗΣ: "+(e.message||e),"err");}
+    finally{kimdisBtn.disabled=false;kimdisBtn.textContent=lbl;}
+  }
+  kimdisBtn.addEventListener("click",kimdisFetch);
   const body=el("div",{},
     el("p",{class:"mo-muted",style:"margin-top:0"},el("b",{},studyTitle(stdy)),
       " · Εκτιμώμενη καθαρή αξία: ",el("b",{},eur(stdy.net_total)),
@@ -5998,7 +6101,7 @@ function assignForm(existing){
     el("div",{class:"mo-field"},el("label",{},LBL().partyLbl+" *"),
       el("div",{style:"display:flex;gap:8px;align-items:center"},supSel,
         el("button",{class:"mo-btn mo-sm",type:"button",onclick:()=>supplierForm(null,ns=>{fillSup(ns.id);supSel.value=ns.id;},stdy.supplier_name||"")},"＋ Νέος"))),
-    row2(fld("ΑΔΑΜ","adam","text",c.adam,f,"π.χ. 26SYMV000000000"),fld("Αρ. πρωτοκόλλου","protocol_no","text",c.protocol_no,f)),
+    adamRow,kimdisPanel,
     row2(fld("Έναρξη","start_date","date",c.start_date,f),fld("Λήξη","end_date","date",c.end_date,f)),
     vatField,
     el("div",{class:"mo-field"},el("label",{},"Οικονομική προσφορά / συμβατικές τιμές"),modeSel),
