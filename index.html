@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self';script-src 'self' file: 'sha256-NLpLpNcz/YNRtPjxWZxYhJhG/C9dgIDbxNMbQT8EKjY=' 'sha256-LDQo4QoDmR/EuTO/aaTGm+oVtYdV2qN6NkxIuZtifwU='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; connect-src https://omncqldgtkdcjpqfwwlr.supabase.co wss://omncqldgtkdcjpqfwwlr.supabase.co https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self';script-src 'self' file: 'sha256-NLpLpNcz/YNRtPjxWZxYhJhG/C9dgIDbxNMbQT8EKjY=' 'sha256-ISbAPwvXAjfzKLjluZ6LDd0Z3minE+GZWVezcIME0/8='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; connect-src https://omncqldgtkdcjpqfwwlr.supabase.co wss://omncqldgtkdcjpqfwwlr.supabase.co https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'">
 <title>Δήμος Ρόδου · Προμήθειες &amp; Υπηρεσίες v36.6.6 PRODUCTION RESILIENCE</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3043,6 +3043,67 @@ async function loadLocked(){
   LOCKED_HISTORY=awardGroup?all:[];
   CAP_LOCKED=awardGroup?all.filter(r=>r.record_status!=='cancelled'):[];
   LOCKED=CAP_LOCKED.filter(r=>String(r.municipal_unit_id)===String(cur.unitId)).sort((a,b)=>Number(a.seq||0)-Number(b.seq||0));
+  await loadGroupUsage();
+}
+/* Απορρόφηση του κοινού ορίου των 30.000 € ανά ομοειδές αντικείμενο, για την
+   ΟΜΑΔΑ Δημοτικών Ενοτήτων στην οποία ανήκει η επιλεγμένη Δ.Ε. Το όριο είναι
+   κοινό για όλη την τετράδα, οπότε η απορρόφηση υπολογίζεται σε όλες τις Δ.Ε.
+   της ομάδας — όχι μόνο στην τρέχουσα.
+
+   Το loadLocked φέρνει μόνο την επιλεγμένη ομάδα υλικών· εδώ χρειάζονται όλες
+   ταυτόχρονα, ώστε κάθε πλήκτρο να δείχνει τη δική του κατάσταση. */
+let GROUP_USED={};
+async function loadGroupUsage(){
+  GROUP_USED={};
+  if(!cur.unitId||cur.unitId===CENTRAL_UNIT){paintGrpNav();return;}
+  const awardGroup=currentAwardGroup();
+  if(!awardGroup){paintGrpNav();return;}
+  const unitIds=awardGroupUnitIds(awardGroup);
+  if(!unitIds.length){paintGrpNav();return;}
+  const {data,error}=await sb.from('locked_studies')
+    .select('group_id,net_total,record_status')
+    .in('municipal_unit_id',unitIds).eq('request_year',YEAR);
+  if(error){console.warn('loadGroupUsage',error);paintGrpNav();return;}
+  (data||[]).forEach(r=>{
+    if(r.record_status==='cancelled')return;
+    const k=String(r.group_id);
+    GROUP_USED[k]=Math.round(((GROUP_USED[k]||0)+Number(r.net_total||0))*100)/100;
+  });
+  paintGrpNav();
+}
+/* Το πλήκτρο γεμίζει από αριστερά όσο απορροφάται το όριο, και το χρώμα
+   κλιμακώνεται καθώς πλησιάζει. Έτσι φαίνεται με μια ματιά ποια ομοειδή
+   αντικείμενα έχουν περιθώριο και ποια όχι. */
+function groupUsageTint(pct){
+  if(pct>=100)return'rgba(220,38,38,.30)';
+  if(pct>=90)return'rgba(220,38,38,.22)';
+  if(pct>=70)return'rgba(217,119,6,.22)';
+  return'rgba(37,99,235,.18)';
+}
+function paintGrpNav(){
+  const nav=$('#grpNav');if(!nav)return;
+  const cap=directAwardCap()||DEFAULT_DIRECT_AWARD_CAP;
+  [...nav.children].forEach(b=>{
+    if(!b.dataset||!b.dataset.gid)return;
+    const used=GROUP_USED[String(b.dataset.gid)]||0;
+    let tag=b.querySelector('.usage');
+    if(!(used>0)||!(cap>0)){
+      if(tag)tag.remove();
+      b.style.removeProperty('background-image');
+      b.removeAttribute('title');
+      return;
+    }
+    const pct=Math.min(100,Math.round(used/cap*1000)/10);
+    b.style.backgroundImage='linear-gradient(90deg,'+groupUsageTint(pct)+' 0 '+pct+'%,transparent '+pct+'% 100%)';
+    b.title='Απορρόφηση ομάδας Δ.Ε.: '+fmtE(used)+' από '+fmtE(cap)+' · υπόλοιπο '+fmtE(Math.round((cap-used)*100)/100);
+    if(!tag){
+      tag=document.createElement('span');tag.className='usage';
+      tag.style.marginLeft='6px';tag.style.fontSize='11px';tag.style.fontWeight='700';
+      tag.style.opacity='.85';b.appendChild(tag);
+    }
+    tag.textContent=fmtN(pct)+'%';
+    tag.style.color=pct>=90?'#b91c1c':(pct>=70?'#b45309':'#1d4ed8');
+  });
 }
 function lockedNetSum(){return Math.round(CAP_LOCKED.reduce((s,r)=>s+Number(r.net_total||0),0)*100)/100;}
 const LOCK_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
