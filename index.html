@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self';script-src 'self' file: 'sha256-NLpLpNcz/YNRtPjxWZxYhJhG/C9dgIDbxNMbQT8EKjY=' 'sha256-VkpKRfyx+KpPV2QLcczOQKv4kgWd2uSsyA5ZB/GJq00='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; connect-src https://omncqldgtkdcjpqfwwlr.supabase.co wss://omncqldgtkdcjpqfwwlr.supabase.co https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self';script-src 'self' file: 'sha256-NLpLpNcz/YNRtPjxWZxYhJhG/C9dgIDbxNMbQT8EKjY=' 'sha256-LDQo4QoDmR/EuTO/aaTGm+oVtYdV2qN6NkxIuZtifwU='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; connect-src https://omncqldgtkdcjpqfwwlr.supabase.co wss://omncqldgtkdcjpqfwwlr.supabase.co https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'">
 <title>Δήμος Ρόδου · Προμήθειες &amp; Υπηρεσίες v36.6.6 PRODUCTION RESILIENCE</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -5871,33 +5871,25 @@ function renderWorkspace(content){
     }else{
       box.append(el("p",{class:"mo-muted",style:"margin:0"},"Δεν έχει καταχωρηθεί ανάθεση για τη μελέτη — η καταχώριση γίνεται από τον χρήστη της Δ.Ε. ή τον διαχειριστή."));
     }
+    box.append(el("div",{class:"mo-muted",style:"font-size:12px;margin-top:14px;border-top:1px solid var(--line);padding-top:10px"},
+      "Τα παρακάτω συμπληρώνονται αυτόματα μόλις καταχωριστεί ο ΑΔΑΜ της σύμβασης:"));
+    box.append(renderContractFields(stdy,null,null));
     content.append(box);
     if(st.orders.length){content.append(el("div",{style:"margin-top:14px"}));renderRegistry(content);}
     return;
   }
   const sup=byId(st.suppliers,st.contract.supplier_id)||{};
+  /* Ίδια λίστα πεδίων με την αχνή προεπισκόπηση της ασυμβασιοποίητης μελέτης:
+     ό,τι φαινόταν κενό, εδώ είναι συμπληρωμένο. */
+  const kimdisPdfHref=kimdisLinkFor((st.contract.kimdis&&st.contract.kimdis.adam)||st.contract.adam);
   content.append(el("div",{class:"mo-card mo-pad mo-conline"},
     el("div",{},
-      el("b",{},LBL().partyLbl+": "+(sup.name||"—")),
-      el("div",{class:"mo-muted",style:"font-size:12.5px"},
-        (sup.email?("✉ "+sup.email+"  "):"")+(sup.viber_phone?("📱 "+sup.viber_phone+"  "):"")+(sup.afm?("ΑΦΜ "+sup.afm):"")),
-      el("div",{class:"mo-muted",style:"font-size:12.5px"},
-        (st.contract.adam?("ΑΔΑΜ "+st.contract.adam+" · "):"")+(st.contract.protocol_no?(st.contract.protocol_no+" · "):"")+
-        dGR(st.contract.start_date)+"–"+dGR(st.contract.end_date)),
-      (function(){
-        /* Ό,τι αντλήθηκε από το ΚΗΜΔΗΣ φαίνεται και εδώ, μαζί με σύνδεσμο προς
-           το πρωτότυπο PDF της σύμβασης. */
-        const km=st.contract.kimdis;
-        if(!km||typeof km!=="object")return null;
-        const bits=[km.aaht?("Α/Α ΕΣΗΔΗΣ "+km.aaht):null,km.ada?("ΑΔΑ "+km.ada):null,
-          km.cpv_code?("CPV "+km.cpv_code):null,km.procedure_type,km.organization].filter(Boolean);
-        const href=kimdisLinkFor(km.adam||st.contract.adam);
-        return el("div",{class:"mo-muted",style:"font-size:12.5px"},
-          bits.join(" · "),
-          href?el("a",{href:href,target:"_blank",rel:"noopener",class:"mo-link",style:"margin-left:8px"},"⬇ Σύμβαση (PDF)"):null);
-      })(),
-      el("div",{class:"mo-muted",style:"font-size:12.5px"},
-        "Εκτιμώμενη: "+eur(st.contract.estimated_amount!=null?st.contract.estimated_amount:stdy.net_total)+" · Συμβατική: "+eur(st.contract.total_amount)+" · "+contractPricingModeLabel(st.contract)))));
+      el("div",{style:"display:flex;gap:10px;align-items:center;flex-wrap:wrap"},
+        el("b",{},LBL().partyLbl+": "+(sup.name||"—")),
+        kimdisPdfHref?el("a",{href:kimdisPdfHref,target:"_blank",rel:"noopener",class:"mo-btn mo-sm"},"⬇ Σύμβαση (PDF)"):null),
+      (sup.email||sup.viber_phone)?el("div",{class:"mo-muted",style:"font-size:12.5px;margin-top:2px"},
+        (sup.email?("✉ "+sup.email+"  "):"")+(sup.viber_phone?("📱 "+sup.viber_phone):"")):null,
+      renderContractFields(stdy,st.contract,sup))));
   /* tabs */
   const tabs=el("div",{class:"mo-tabs"},
     el("button",{class:"mo-tab"+(st.view==="new"?" mo-on":""),onclick:()=>{st.view="new";renderAll();}},
@@ -5916,6 +5908,45 @@ function contractPricingModeLabel(c){
   if(m==="discount")return "Ενιαία έκπτωση "+qy(c.discount_pct||0)+"%";
   if(m==="item_prices")return "Κατακυρωμένες τιμές ανά είδος";
   return "Τιμές μελέτης";
+}
+/* Τα ίδια πεδία εμφανίζονται πριν και μετά τη συμβασιοποίηση. Πριν, αχνά και
+   κενά: η κλειδωμένη μελέτη δείχνει τι θα συμπληρωθεί μόλις οριστεί ο ανάδοχος
+   και αντληθούν τα στοιχεία από το ΚΗΜΔΗΣ. Μία λίστα, ώστε ό,τι φαίνεται αχνό
+   να είναι ακριβώς αυτό που θα γεμίσει. */
+function contractFieldRows(stdy,contract,sup){
+  const km=(contract&&contract.kimdis&&typeof contract.kimdis==="object")?contract.kimdis:{};
+  const v=x=>(x==null||x==="")?null:String(x);
+  const dates=contract&&(contract.start_date||contract.end_date)
+    ? dGR(contract.start_date)+" – "+dGR(contract.end_date) : null;
+  return [
+    [LBL().partyLbl, v(sup&&sup.name)||v(km.supplier_name)],
+    ["Α.Φ.Μ. αναδόχου", v(sup&&sup.afm)||v(km.supplier_afm)],
+    ["ΑΔΑΜ σύμβασης", v(contract&&contract.adam)],
+    ["Αριθμός σύμβασης", v(contract&&contract.protocol_no)],
+    ["Διάρκεια", dates],
+    ["Εκτιμώμενη αξία μελέτης", eur(stdy.net_total)],
+    ["Συμβατική αξία", contract&&contract.total_amount!=null?eur(contract.total_amount):null],
+    ["Έκπτωση", contract?contractPricingModeLabel(contract):null],
+    ["Τίτλος σύμβασης", v(km.title)],
+    ["Α/Α ΕΣΗΔΗΣ", v(km.aaht)],
+    ["ΑΔΑ απόφασης", v(km.ada)],
+    ["CPV", km.cpv_code?(km.cpv_code+(km.cpv_label?(" — "+km.cpv_label):"")):null],
+    ["Διαδικασία", v(km.procedure_type)],
+    ["Νομικό πλαίσιο", v(km.legal_context)],
+    ["Αναθέτουσα αρχή", v(km.organization)],
+    ["Υπογράφων", v(km.signer)],
+    ["Εντολές πληρωμής", Array.isArray(km.payments)&&km.payments.length?km.payments.join(", "):null]
+  ];
+}
+function renderContractFields(stdy,contract,sup){
+  const grid=el("div",{style:"display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:12.5px;margin-top:8px"});
+  contractFieldRows(stdy,contract,sup).forEach(r=>{
+    grid.append(el("div",{class:"mo-muted"},r[0]));
+    grid.append(r[1]!=null
+      ? el("div",{},r[1])
+      : el("div",{class:"mo-muted",style:"opacity:.45"},"—"));
+  });
+  return grid;
 }
 function contractPricingRows(stdy,existing){
   const src=existing?(st.citems||[]):(stdy.lines||[]);

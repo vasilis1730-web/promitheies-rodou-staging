@@ -286,3 +286,30 @@ test('τα μεταδεδομένα ΚΗΜΔΗΣ φορτώνονται μαζί
   assert.match(source, /discount_pct,vat_rate,kimdis,kimdis_fetched_at/,
     'χωρίς τη στήλη στο select, η κάρτα της μελέτης δεν θα τα έβλεπε ποτέ');
 });
+
+test('η ίδια λίστα πεδίων χρησιμοποιείται πριν και μετά τη συμβασιοποίηση', () => {
+  // Ό,τι φαίνεται αχνό στην κλειδωμένη μελέτη πρέπει να είναι ακριβώς αυτό
+  // που γεμίζει όταν περαστεί ο ανάδοχος — μία λίστα, δύο καταστάσεις.
+  assert.match(source, /function contractFieldRows\(stdy,contract,sup\)/);
+  assert.match(source, /function renderContractFields\(stdy,contract,sup\)/);
+  assert.match(source, /renderContractFields\(stdy,null,null\)/, 'η αχνή προεπισκόπηση');
+  assert.match(source, /renderContractFields\(stdy,st\.contract,sup\)/, 'η συμπληρωμένη κάρτα');
+});
+
+test('η προεπισκόπηση περιλαμβάνει όλα τα πεδία που ζητήθηκαν', () => {
+  const block = source.slice(source.indexOf('function contractFieldRows'),
+                             source.indexOf('function renderContractFields'));
+  for (const label of ['Α.Φ.Μ. αναδόχου', 'ΑΔΑΜ σύμβασης', 'Αριθμός σύμβασης', 'Διάρκεια',
+                       'Εκτιμώμενη αξία μελέτης', 'Συμβατική αξία', 'Έκπτωση', 'Τίτλος σύμβασης',
+                       'Α/Α ΕΣΗΔΗΣ', 'ΑΔΑ απόφασης', 'CPV', 'Διαδικασία', 'Νομικό πλαίσιο',
+                       'Αναθέτουσα αρχή', 'Υπογράφων', 'Εντολές πληρωμής']) {
+    assert.ok(block.includes('"' + label + '"'), 'λείπει το πεδίο ' + label);
+  }
+});
+
+test('τα κενά πεδία εμφανίζονται αχνά, όχι ως κενό', () => {
+  const block = source.slice(source.indexOf('function renderContractFields'),
+                             source.indexOf('function renderContractFields') + 700);
+  assert.match(block, /opacity:\.45/, 'τα πεδία που δεν έχουν έρθει ακόμη πρέπει να ξεχωρίζουν οπτικά');
+  assert.ok(block.includes('"—"'));
+});
