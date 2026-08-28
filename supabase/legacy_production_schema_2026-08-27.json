@@ -1,0 +1,192 @@
+{
+  "_comment": "Στιγμιότυπο σχήματος του ΠΑΛΙΟΥ παραγωγικού (hafaxrebjzootjzzqkzx), απευθείας ανάγνωση 2026-08-27. Μορφή: πίνακας -> στήλη -> [τύπος, δέχεται null, έχει default]. Χρησιμοποιείται από tools/schema-diff-legacy.mjs για τον σχεδιασμό της Φάσης 5.",
+  "_source": "information_schema.columns, schema public",
+  "tables": {
+    "profiles": {
+      "id": ["uuid", false, false],
+      "email": ["text", true, false],
+      "full_name": ["text", true, false],
+      "role": ["USER-DEFINED", false, true],
+      "municipal_unit_id": ["smallint", true, false],
+      "is_active": ["boolean", false, true],
+      "created_at": ["timestamp with time zone", false, true],
+      "updated_at": ["timestamp with time zone", false, true]
+    },
+    "unit_requests": {
+      "id": ["uuid", false, true],
+      "municipal_unit_id": ["smallint", false, false],
+      "group_id": ["smallint", false, false],
+      "request_year": ["integer", false, true],
+      "title": ["text", true, false],
+      "status": ["USER-DEFINED", false, true],
+      "created_by": ["uuid", true, false],
+      "updated_by": ["uuid", true, false],
+      "created_at": ["timestamp with time zone", false, true],
+      "updated_at": ["timestamp with time zone", false, true],
+      "saved_at": ["timestamp with time zone", true, false],
+      "cleaned_at": ["timestamp with time zone", true, false],
+      "locked_at": ["timestamp with time zone", true, false]
+    },
+    "request_lines": {
+      "request_id": ["uuid", false, false],
+      "material_id": ["uuid", false, false],
+      "quantity": ["numeric", false, true],
+      "unit_price": ["numeric", false, true],
+      "line_status": ["USER-DEFINED", false, true],
+      "comments": ["text", true, false],
+      "created_at": ["timestamp with time zone", false, true],
+      "updated_at": ["timestamp with time zone", false, true],
+      "updated_by": ["uuid", true, false],
+      "subtotal": ["numeric", true, false]
+    },
+    "saved_versions": {
+      "id": ["uuid", false, true],
+      "request_id": ["uuid", false, false],
+      "action": ["text", false, false],
+      "snapshot": ["jsonb", true, false],
+      "created_by": ["uuid", true, false],
+      "created_at": ["timestamp with time zone", false, true]
+    },
+    "locked_studies": {
+      "id": ["uuid", false, true],
+      "municipal_unit_id": ["smallint", false, false],
+      "group_id": ["smallint", false, false],
+      "request_year": ["integer", false, false],
+      "source_request_id": ["uuid", true, false],
+      "seq": ["integer", false, true],
+      "label": ["text", true, false],
+      "net_total": ["numeric", false, true],
+      "item_count": ["integer", false, true],
+      "lines": ["jsonb", false, true],
+      "supplier_name": ["text", true, false],
+      "kimdis_url": ["text", true, false],
+      "locked_by": ["uuid", true, false],
+      "locked_at": ["timestamp with time zone", false, true],
+      "created_at": ["timestamp with time zone", false, true]
+    },
+    "export_jobs": {
+      "id": ["uuid", false, true],
+      "request_id": ["uuid", true, false],
+      "municipal_unit_id": ["smallint", true, false],
+      "group_id": ["smallint", true, false],
+      "export_type": ["text", false, false],
+      "scope": ["text", false, false],
+      "file_name": ["text", true, false],
+      "payload": ["jsonb", true, false],
+      "created_by": ["uuid", true, false],
+      "created_at": ["timestamp with time zone", false, true]
+    },
+    "tender_overrides": {
+      "id": ["text", false, false],
+      "data": ["jsonb", false, true],
+      "updated_by": ["uuid", true, false],
+      "updated_at": ["timestamp with time zone", false, true]
+    },
+    "mo_suppliers": {
+      "id": ["uuid", false, true],
+      "name": ["text", false, false],
+      "afm": ["text", true, false],
+      "email": ["text", true, false],
+      "viber_phone": ["text", true, false],
+      "phone": ["text", true, false],
+      "address": ["text", true, false],
+      "active": ["boolean", false, true],
+      "created_at": ["timestamp with time zone", false, true]
+    },
+    "mo_receivers": {
+      "id": ["uuid", false, true],
+      "name": ["text", false, false],
+      "role": ["text", true, false],
+      "email": ["text", true, false],
+      "viber_phone": ["text", true, false],
+      "phone": ["text", true, false],
+      "active": ["boolean", false, true],
+      "created_at": ["timestamp with time zone", false, true]
+    },
+    "mo_projects": {
+      "id": ["uuid", false, true],
+      "name": ["text", false, false],
+      "code": ["text", true, false],
+      "active": ["boolean", false, true],
+      "created_at": ["timestamp with time zone", false, true]
+    },
+    "mo_contracts": {
+      "id": ["uuid", false, true],
+      "supplier_id": ["uuid", false, false],
+      "title": ["text", false, false],
+      "adam": ["text", true, false],
+      "protocol_no": ["text", true, false],
+      "cpv": ["text", true, false],
+      "start_date": ["date", true, false],
+      "end_date": ["date", true, false],
+      "total_amount": ["numeric", false, true],
+      "vat_rate": ["numeric", false, true],
+      "active": ["boolean", false, true],
+      "created_at": ["timestamp with time zone", false, true],
+      "source_study_id": ["uuid", true, false],
+      "municipal_unit_id": ["smallint", true, false]
+    },
+    "mo_contract_items": {
+      "id": ["uuid", false, true],
+      "contract_id": ["uuid", false, false],
+      "code": ["text", true, false],
+      "description": ["text", false, false],
+      "unit": ["text", true, false],
+      "unit_price": ["numeric", false, true],
+      "created_at": ["timestamp with time zone", false, true],
+      "cpv": ["text", true, false],
+      "contract_qty": ["numeric", true, false],
+      "material_id": ["uuid", true, false]
+    },
+    "mo_orders": {
+      "id": ["uuid", false, true],
+      "order_no": ["text", true, false],
+      "order_date": ["date", false, true],
+      "supplier_id": ["uuid", true, false],
+      "contract_id": ["uuid", true, false],
+      "receiver_id": ["uuid", true, false],
+      "project_id": ["uuid", true, false],
+      "usage_location": ["text", true, false],
+      "notes": ["text", true, false],
+      "vat_rate": ["numeric", false, true],
+      "subtotal": ["numeric", false, true],
+      "vat": ["numeric", false, true],
+      "total": ["numeric", false, true],
+      "status": ["text", false, true],
+      "sent_at": ["date", true, false],
+      "received_at": ["date", true, false],
+      "created_by": ["uuid", true, true],
+      "created_at": ["timestamp with time zone", false, true],
+      "municipal_unit_id": ["smallint", true, false],
+      "study_id": ["uuid", true, false],
+      "issued_at": ["timestamp with time zone", true, false],
+      "issued_by": ["uuid", true, false]
+    },
+    "mo_order_items": {
+      "id": ["uuid", false, true],
+      "order_id": ["uuid", false, false],
+      "description": ["text", false, false],
+      "unit": ["text", true, false],
+      "quantity": ["numeric", false, true],
+      "unit_price": ["numeric", false, true],
+      "line_total": ["numeric", false, true],
+      "contract_item_id": ["uuid", true, false],
+      "is_custom": ["boolean", false, true],
+      "mapping": ["jsonb", true, false]
+    },
+    "mo_counters": {
+      "scope": ["text", false, false],
+      "value": ["integer", false, true]
+    }
+  },
+  "row_counts": {
+    "profiles": 15, "unit_requests": 55, "request_lines": 182, "saved_versions": 282,
+    "locked_studies": 6, "export_jobs": 17, "tender_overrides": 1,
+    "mo_suppliers": 3, "mo_receivers": 0, "mo_projects": 1, "mo_contracts": 3,
+    "mo_contract_items": 157, "mo_orders": 1, "mo_order_items": 1, "mo_counters": 3
+  },
+  "foreign_apps": {
+    "_comment": "Πίνακες άλλων εφαρμογών στο ίδιο project. ΔΕΝ μεταφέρονται και ΔΕΝ διαγράφονται.",
+    "esidis_folders": 9, "esidis_folder_log": 21, "yde_profiles": 2, "yde_projects": 0
+  }
+}
