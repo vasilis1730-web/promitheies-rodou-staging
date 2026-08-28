@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self';script-src 'self' file: 'sha256-NLpLpNcz/YNRtPjxWZxYhJhG/C9dgIDbxNMbQT8EKjY=' 'sha256-mWARJHixVWiizmGQAzdTpJtXDufk92qJpyujU3o/5GY='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; connect-src https://omncqldgtkdcjpqfwwlr.supabase.co wss://omncqldgtkdcjpqfwwlr.supabase.co https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self';script-src 'self' file: 'sha256-NLpLpNcz/YNRtPjxWZxYhJhG/C9dgIDbxNMbQT8EKjY=' 'sha256-VkpKRfyx+KpPV2QLcczOQKv4kgWd2uSsyA5ZB/GJq00='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; connect-src https://omncqldgtkdcjpqfwwlr.supabase.co wss://omncqldgtkdcjpqfwwlr.supabase.co https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'">
 <title>Δήμος Ρόδου · Προμήθειες &amp; Υπηρεσίες v36.6.6 PRODUCTION RESILIENCE</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -5558,7 +5558,7 @@ async function loadStudies(unitId){
 async function loadUnitAgg(unitId){
   const [o,c]=await Promise.all([
     sb.from("mo_orders").select("id,study_id,subtotal,status").eq("municipal_unit_id",unitId),
-    sb.from("mo_contracts").select("id,source_study_id,supplier_id,adam,protocol_no,start_date,end_date,total_amount,estimated_amount,pricing_mode,discount_pct,vat_rate").eq("municipal_unit_id",unitId)
+    sb.from("mo_contracts").select("id,source_study_id,supplier_id,adam,protocol_no,start_date,end_date,total_amount,estimated_amount,pricing_mode,discount_pct,vat_rate,kimdis,kimdis_fetched_at").eq("municipal_unit_id",unitId)
   ]);
   if(o.error)throw o.error; if(c.error)throw c.error;
   return {orders:o.data||[],contracts:c.data||[]};
@@ -5884,6 +5884,18 @@ function renderWorkspace(content){
       el("div",{class:"mo-muted",style:"font-size:12.5px"},
         (st.contract.adam?("ΑΔΑΜ "+st.contract.adam+" · "):"")+(st.contract.protocol_no?(st.contract.protocol_no+" · "):"")+
         dGR(st.contract.start_date)+"–"+dGR(st.contract.end_date)),
+      (function(){
+        /* Ό,τι αντλήθηκε από το ΚΗΜΔΗΣ φαίνεται και εδώ, μαζί με σύνδεσμο προς
+           το πρωτότυπο PDF της σύμβασης. */
+        const km=st.contract.kimdis;
+        if(!km||typeof km!=="object")return null;
+        const bits=[km.aaht?("Α/Α ΕΣΗΔΗΣ "+km.aaht):null,km.ada?("ΑΔΑ "+km.ada):null,
+          km.cpv_code?("CPV "+km.cpv_code):null,km.procedure_type,km.organization].filter(Boolean);
+        const href=kimdisLinkFor(km.adam||st.contract.adam);
+        return el("div",{class:"mo-muted",style:"font-size:12.5px"},
+          bits.join(" · "),
+          href?el("a",{href:href,target:"_blank",rel:"noopener",class:"mo-link",style:"margin-left:8px"},"⬇ Σύμβαση (PDF)"):null);
+      })(),
       el("div",{class:"mo-muted",style:"font-size:12.5px"},
         "Εκτιμώμενη: "+eur(st.contract.estimated_amount!=null?st.contract.estimated_amount:stdy.net_total)+" · Συμβατική: "+eur(st.contract.total_amount)+" · "+contractPricingModeLabel(st.contract)))));
   /* tabs */
@@ -6075,7 +6087,16 @@ function assignForm(existing){
   f.vat_rate.step="0.01";f.vat_rate.min="0";f.vat_rate.max="100";if(existing)f.vat_rate.disabled=true;
   const adamField=fld("ΑΔΑΜ","adam","text",c.adam,f,"π.χ. 25SYMV017115178");
   const kimdisBtn=el("button",{class:"mo-btn mo-sm",type:"button"},"🔎 Άντληση από ΚΗΜΔΗΣ");
-  adamField.append(el("div",{style:"margin-top:6px"},kimdisBtn));
+  /* Το ΚΗΜΔΗΣ δημοσιεύει το πρωτότυπο PDF της πράξης στην ίδια διεύθυνση με
+     τον ΑΔΑΜ. Ο σύνδεσμος ενεργοποιείται μόλις υπάρχει έγκυρος ΑΔΑΜ. */
+  const kimdisPdf=el("a",{class:"mo-btn mo-sm",target:"_blank",rel:"noopener",style:"display:none"},"⬇ Σύμβαση (PDF)");
+  function kimdisPdfFor(adam){
+    const href=adam?kimdisLinkFor(adam):null;
+    if(href){kimdisPdf.setAttribute("href",href);kimdisPdf.style.display="";}
+    else kimdisPdf.style.display="none";
+  }
+  kimdisPdfFor(c.adam);
+  adamField.append(el("div",{style:"margin-top:6px;display:flex;gap:8px;flex-wrap:wrap"},kimdisBtn,kimdisPdf));
   const adamRow=row2(adamField,fld("Αρ. πρωτοκόλλου","protocol_no","text",c.protocol_no,f));
   const kimdisPanel=el("div",{class:"mo-card mo-pad",style:"display:none;margin:8px 0;background:#F8FBFE"});
   let kimdisData=null;
@@ -6083,7 +6104,7 @@ function assignForm(existing){
      κάθε διαφορά αναφέρεται, ώστε να μη χαθεί διόρθωση που έγινε ήδη. */
   /* Κανένα πεδίο δεν αντικαθίσταται σιωπηλά: συμπληρώνονται μόνο τα κενά και
      κάθε διαφορά αναφέρεται, ώστε να μη χαθεί διόρθωση που έγινε ήδη. */
-  function kimdisApply(k){
+  async function kimdisApply(k){
     kimdisData=k;
     const filled=[],kept=[],warn=[];
     const put=(input,label,value)=>{
@@ -6102,7 +6123,21 @@ function assignForm(existing){
         if(!supSel.value){supSel.value=hit.id;filled.push("Ανάδοχος: "+hit.name+" (ΑΦΜ "+k.supplier_afm+")");}
         else if(!sameId(supSel.value,hit.id))kept.push("Ανάδοχος: κρατήθηκε η επιλογή σας — το ΚΗΜΔΗΣ δείχνει «"+hit.name+"»");
       }else{
-        warn.push("Δεν υπάρχει καταχωρισμένος ανάδοχος με ΑΦΜ "+k.supplier_afm+(k.supplier_name?(" («"+k.supplier_name+"»)"):"")+". Δημιουργήστε τον με «＋ Νέος» — τα στοιχεία είναι έτοιμα παρακάτω.");
+        /* Ο ανάδοχος ταυτοποιείται από το ΑΦΜ, όχι από την επωνυμία: το ΚΗΜΔΗΣ
+           και το μητρώο συχνά τη γράφουν λίγο διαφορετικά. Αν λείπει, μπαίνει
+           αυτόματα ώστε η ροή να μη διακόπτεται. */
+        try{
+          const r=await sb.from("mo_suppliers").insert({
+            name:k.supplier_name||("Ανάδοχος ΑΦΜ "+k.supplier_afm),
+            afm:k.supplier_afm,active:true,updated_by:ME.id
+          }).select().single();
+          if(r.error)throw r.error;
+          st.suppliers=await dbAll("mo_suppliers",q=>q.order("name"));
+          fillSup(r.data.id);supSel.value=r.data.id;
+          filled.push("Ανάδοχος: καταχωρίστηκε «"+r.data.name+"» (ΑΦΜ "+k.supplier_afm+") και επιλέχθηκε");
+        }catch(e){
+          warn.push("Δεν καταχωρίστηκε αυτόματα ο ανάδοχος με ΑΦΜ "+k.supplier_afm+(k.supplier_name?(" («"+k.supplier_name+"»)"):"")+": "+(e.message||e)+". Προσθέστε τον με «＋ Νέος».");
+        }
       }
     }
     if(k.net_total!=null){
@@ -6148,6 +6183,7 @@ function assignForm(existing){
       sect("Δεν αντικαταστάθηκαν",kept,null),
       sect("Προσοχή",warn,"var(--mo-err)"));
     kimdisPanel.style.display="";
+    kimdisPdfFor(k.adam||(f.adam&&f.adam.value));
   }
   async function kimdisFetch(){
     const adam=String((f.adam&&f.adam.value)||"").trim().toUpperCase().replace(/\s+/g,"");
@@ -6167,7 +6203,7 @@ function assignForm(existing){
         throw new Error(msg);
       }
       if(!data||!data.ok)throw new Error((data&&data.error)||"Το ΚΗΜΔΗΣ δεν επέστρεψε εγγραφή.");
-      kimdisApply(kimdisMapContract(data.raw));
+      await kimdisApply(kimdisMapContract(data.raw));
       T("Τα στοιχεία του ΚΗΜΔΗΣ αντλήθηκαν.","ok");
     }catch(e){T("ΚΗΜΔΗΣ: "+(e.message||e),"err");}
     finally{kimdisBtn.disabled=false;kimdisBtn.textContent=lbl;}

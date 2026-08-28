@@ -226,3 +226,63 @@ test('η ετικέτα του συνδέσμου ξεχωρίζει από το
   assert.ok(source.includes('"🔎 Άντληση από ΚΗΜΔΗΣ"'), 'το κουμπί άντλησης πρέπει να ξεχωρίζει');
   assert.ok(!source.includes('},"ΚΗΜΔΗΣ ↗")'), 'η παλιά διφορούμενη ετικέτα δεν πρέπει να έχει μείνει');
 });
+
+test('χαρτογραφεί σωστά πραγματική σύμβαση με μειωμένο ΦΠΑ νησιού', () => {
+  const k = kimdisMapContract({
+    title: 'ΑΝΑΓΟΜΩΣΗ ΠΥΡΟΣΒΕΣΤΗΡΩΝ',
+    referenceNumber: '25SYMV018057506',
+    aaht: '1007.E86105.0001',
+    contractNumber: '9596/02-12-2025',
+    contractSignedDate: '2025-12-02',
+    submissionDate: '2025-12-02',
+    organization: { key: '1007', value: 'ΔΗΜΟΣ ΛΕΡΟΥ' },
+    legalContext: { key: '2', value: 'ν.4412/2016 - Βιβλίο Ι – κάτω των ορίων' },
+    contractType: { key: '2', value: 'Υπηρεσίες' },
+    procedureType: { key: '9', value: 'Απευθείας ανάθεση' },
+    contractingDataDetails: {
+      signers: { key: '1', value: 'ΤΙΜΟΘΕΟΣ ΚΩΤΤΑΚΗΣ - Δήμαρχος' },
+      contractingMembersDataList: [
+        { country: { key: 'GR', value: 'Ελλάδα' }, vatNumber: '801362883', name: 'GFS LEROS ΙΕΠΥΑ ΜΟΝΟΠ.ΙΚΕ' }
+      ]
+    },
+    totalCostWithoutVAT: 4245.50,
+    totalCostWithVAT: 4967.24,
+    objectDetailsList: [{ vat: '17', cpvs: [{ key: '50413200-5', value: 'Υπηρεσίες επισκευής και συντήρησης εξοπλισμού πυρόσβεσης' }] }],
+    decisionRelatedAda: 'ΨΑΑ1ΩΛΓ-81Β',
+    paymentRefNo: ['25PAY018125670']
+  });
+  assert.equal(k.title, 'ΑΝΑΓΟΜΩΣΗ ΠΥΡΟΣΒΕΣΤΗΡΩΝ');
+  assert.equal(k.aaht, '1007.E86105.0001', 'το Α/Α ΕΣΗΔΗΣ δεν είναι σκέτος αριθμός');
+  assert.equal(k.protocol_no, '9596/02-12-2025');
+  assert.equal(k.supplier_name, 'GFS LEROS ΙΕΠΥΑ ΜΟΝΟΠ.ΙΚΕ');
+  assert.equal(k.supplier_afm, '801362883');
+  assert.equal(k.supplier_country, 'Ελλάδα');
+  assert.equal(k.net_total, 4245.50);
+  assert.equal(k.gross_total, 4967.24);
+  assert.equal(k.vat_rate, 17, 'ο μειωμένος συντελεστής νησιού πρέπει να γίνεται δεκτός');
+  assert.equal(k.cpv_code, '50413200-5');
+  assert.equal(k.organization, 'ΔΗΜΟΣ ΛΕΡΟΥ');
+  assert.equal(k.signer, 'ΤΙΜΟΘΕΟΣ ΚΩΤΤΑΚΗΣ - Δήμαρχος');
+  assert.equal(k.ada, 'ΨΑΑ1ΩΛΓ-81Β');
+  assert.deepEqual([...k.payments], ['25PAY018125670']);
+  // Η αξία με ΦΠΑ επαληθεύει τον συντελεστή: 4.245,50 × 1,17 = 4.967,235.
+  // Το ΚΗΜΔΗΣ δημοσιεύει 4.967,24· ανοχή ενός λεπτού για τη στρογγυλοποίηση.
+  assert.ok(Math.abs(k.net_total * (1 + k.vat_rate / 100) - k.gross_total) <= 0.01,
+    'ο συντελεστής ΦΠΑ πρέπει να συμφωνεί με τα δύο δημοσιευμένα ποσά');
+});
+
+test('ο ανάδοχος καταχωρίζεται αυτόματα όταν λείπει από το μητρώο', () => {
+  assert.match(source, /sb\.from\("mo_suppliers"\)\.insert\(\{[\s\S]{0,200}afm:k\.supplier_afm/,
+    'το ΑΦΜ πρέπει να αποθηκεύεται ως ταυτότητα του αναδόχου');
+  assert.ok(source.includes('καταχωρίστηκε «'), 'η αυτόματη καταχώριση πρέπει να αναφέρεται στον χρήστη');
+});
+
+test('υπάρχει λήψη του πρωτότυπου PDF της σύμβασης', () => {
+  assert.ok(source.includes('"⬇ Σύμβαση (PDF)"'));
+  assert.match(source, /function kimdisPdfFor\(adam\)/);
+});
+
+test('τα μεταδεδομένα ΚΗΜΔΗΣ φορτώνονται μαζί με τη σύμβαση', () => {
+  assert.match(source, /discount_pct,vat_rate,kimdis,kimdis_fetched_at/,
+    'χωρίς τη στήλη στο select, η κάρτα της μελέτης δεν θα τα έβλεπε ποτέ');
+});
