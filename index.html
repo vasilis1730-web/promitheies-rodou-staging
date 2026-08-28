@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self';script-src 'self' file: 'sha256-NLpLpNcz/YNRtPjxWZxYhJhG/C9dgIDbxNMbQT8EKjY=' 'sha256-PNUJvxgwNZd8fhrmX+q4qv4YEYGX0iXFHav9N0snOF4='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; connect-src https://omncqldgtkdcjpqfwwlr.supabase.co wss://omncqldgtkdcjpqfwwlr.supabase.co https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self';script-src 'self' file: 'sha256-NLpLpNcz/YNRtPjxWZxYhJhG/C9dgIDbxNMbQT8EKjY=' 'sha256-mWARJHixVWiizmGQAzdTpJtXDufk92qJpyujU3o/5GY='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; connect-src https://omncqldgtkdcjpqfwwlr.supabase.co wss://omncqldgtkdcjpqfwwlr.supabase.co https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'">
 <title>Δήμος Ρόδου · Προμήθειες &amp; Υπηρεσίες v36.6.6 PRODUCTION RESILIENCE</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -5847,7 +5847,7 @@ function renderWorkspace(content){
     el("div",{class:"mo-study-top"},
       el("span",{class:"mo-dbadge "+(dm==="service"?"mo-d-svc":"mo-d-proc")},dm==="service"?"ΥΠΗΡΕΣΙΕΣ":"ΥΛΙΚΑ"),
       el("b",{style:"font-size:16px"},studyTitle(stdy)),
-      stdy.kimdis_url?el("a",{href:stdy.kimdis_url,target:"_blank",rel:"noopener",class:"mo-link"},"ΚΗΜΔΗΣ ↗"):null),
+      kimdisLinkFor(stdy.kimdis_url)?el("a",{href:kimdisLinkFor(stdy.kimdis_url),target:"_blank",rel:"noopener",class:"mo-link",title:"Άνοιγμα της πράξης στο ΚΗΜΔΗΣ σε νέα καρτέλα"},"Σύνδεσμος ΚΗΜΔΗΣ ↗"):null),
     el("div",{class:"mo-muted",style:"font-size:12.5px;margin-top:4px"},
       "Κλειδώθηκε: "+dGR(stdy.locked_at)+" · "+(stdy.item_count||((stdy.lines||[]).length))+" είδη · Καθαρή αξία μελέτης: "+eur(stdy.net_total)),
     el("div",{class:"mo-meter "+mcls,style:"margin-top:10px"},el("i",{style:"width:"+pct+"%"})),
@@ -5924,6 +5924,30 @@ function contractPricingRows(stdy,existing){
    API. Η κλήση περνά από την edge function kimdis-lookup, γιατί το κρατικό
    API δεν στέλνει CORS headers και η CSP επιτρέπει μόνο τον host του
    Supabase — όπου ζει και η ίδια η συνάρτηση. */
+/* Το πεδίο «Σύνδεσμος ΚΗΜΔΗΣ» της κλειδωμένης μελέτης δέχεται είτε πλήρη
+   διεύθυνση είτε σκέτο ΑΔΑΜ. Ένας ΑΔΑΜ αποθηκευμένος ως «https://25SYMV…»
+   παράγει σύνδεσμο προς ανύπαρκτο όνομα τομέα: ανοίγει νέα καρτέλα με σφάλμα.
+   Εδώ μετατρέπεται σε πραγματική διεύθυνση του ΚΗΜΔΗΣ, και ό,τι δεν είναι
+   αναγνωρίσιμο δεν εμφανίζεται καθόλου ως σύνδεσμος. */
+const KIMDIS_BASE="https://cerpp.eprocurement.gov.gr/khmdhs-opendata";
+const KIMDIS_KIND_PATH={REQ:"request",PROC:"notice",AWRD:"award",SYMV:"contract"};
+function kimdisLinkFor(value){
+  const raw=String(value==null?"":value).trim();
+  if(!raw)return null;
+  const adam=(raw.toUpperCase().match(/\d{2}(?:REQ|PROC|AWRD|SYMV)\d{9}/)||[])[0];
+  if(adam){
+    const kind=adam.slice(2,adam.length-9);
+    return KIMDIS_BASE+"/"+(KIMDIS_KIND_PATH[kind]||"contract")+"/attachment/"+adam;
+  }
+  if(/^https?:\/\//i.test(raw)){
+    try{
+      const u=new URL(raw);
+      /* Χωρίς τελεία ο host δεν είναι πραγματικό όνομα τομέα. */
+      if(u.hostname.indexOf(".")>0)return u.href;
+    }catch(ignored){}
+  }
+  return null;
+}
 const KIMDIS_ADAM_RE=/^\d{2}(REQ|PROC|AWRD|SYMV)\d{9}$/;
 const kimdisAfm=v=>String(v==null?"":v).replace(/\D/g,"");
 function kimdisMapContract(raw){

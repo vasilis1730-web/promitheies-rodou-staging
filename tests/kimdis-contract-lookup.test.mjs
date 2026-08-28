@@ -8,10 +8,14 @@ const edgeFn = fs.readFileSync(new URL('../supabase/functions/kimdis-lookup/inde
 
 /* Οι κανόνες εξάγονται από το ίδιο το index.html: αν αλλάξουν εκεί χωρίς να
    αλλάξουν οι δοκιμές, το CI αποτυγχάνει. */
-const sandbox = vm.createContext({});
+// Ο browser έχει το URL ως global· το vm context ξεκινά άδειο και πρέπει να δοθεί.
+const sandbox = vm.createContext({ URL });
 for (const [name, pattern] of [
   ['KIMDIS_ADAM_RE', /const KIMDIS_ADAM_RE=[^\n]+/],
   ['kimdisAfm', /const kimdisAfm=[^\n]+/],
+  ['KIMDIS_BASE', /const KIMDIS_BASE=[^\n]+/],
+  ['KIMDIS_KIND_PATH', /const KIMDIS_KIND_PATH=[^\n]+/],
+  ['kimdisLinkFor', /function kimdisLinkFor\(value\)\{[\s\S]*?\n\}/],
   ['kimdisMapContract', /function kimdisMapContract\(raw\)\{[\s\S]*?\n\}/],
   ['kimdisDiscountPct', /function kimdisDiscountPct\(net,estimated\)\{[\s\S]*?\n\}/]
 ]) {
@@ -26,6 +30,7 @@ const kimdisMapContract = read('kimdisMapContract');
 const kimdisDiscountPct = read('kimdisDiscountPct');
 const kimdisAfm = read('kimdisAfm');
 const KIMDIS_ADAM_RE = read('KIMDIS_ADAM_RE');
+const kimdisLinkFor = read('kimdisLinkFor');
 
 /* Απάντηση στο ΑΚΡΙΒΕΣ σχήμα του ΚΗΜΔΗΣ Open Data API. */
 const SYMV = {
@@ -190,4 +195,34 @@ test('η καρτέλα εμφανίζει τα πεδία και η αποθή�
   assert.match(source, /sb\.rpc\("set_contract_kimdis"/);
   // Το μήνυμα του server πρέπει να φτάνει στον χρήστη, όχι το γενικό «non-2xx».
   assert.match(source, /await error\.context\.json\(\)/);
+});
+
+test('ΑΔΑΜ γραμμένος στο πεδίο συνδέσμου γίνεται πραγματική διεύθυνση ΚΗΜΔΗΣ', () => {
+  // Αυτό ακριβώς ήταν αποθηκευμένο και άνοιγε νέα καρτέλα με σφάλμα DNS.
+  assert.equal(kimdisLinkFor('https://25SYMV018057506'),
+    'https://cerpp.eprocurement.gov.gr/khmdhs-opendata/contract/attachment/25SYMV018057506');
+  assert.equal(kimdisLinkFor('25SYMV018057506'),
+    'https://cerpp.eprocurement.gov.gr/khmdhs-opendata/contract/attachment/25SYMV018057506');
+  assert.match(kimdisLinkFor('24PROC014500000'), /\/notice\/attachment\/24PROC014500000$/);
+  assert.match(kimdisLinkFor('26REQ000000001'), /\/request\/attachment\/26REQ000000001$/);
+  assert.match(kimdisLinkFor('25AWRD000000001'), /\/award\/attachment\/25AWRD000000001$/);
+});
+
+test('πραγματική διεύθυνση διατηρείται αυτούσια', () => {
+  assert.equal(kimdisLinkFor('https://www.eprocurement.gov.gr/kimds2/x?y=1'),
+    'https://www.eprocurement.gov.gr/kimds2/x?y=1');
+});
+
+test('ό,τι δεν είναι αναγνωρίσιμο δεν γίνεται σύνδεσμος', () => {
+  // Καλύτερα κανένας σύνδεσμος παρά σύνδεσμος που ανοίγει σελίδα σφάλματος.
+  for (const bad of ['', null, undefined, '   ', 'https://xoris-teleia', 'σκέτο κείμενο',
+                     'javascript:alert(1)', 'http://']) {
+    assert.equal(kimdisLinkFor(bad), null, JSON.stringify(bad));
+  }
+});
+
+test('η ετικέτα του συνδέσμου ξεχωρίζει από το κουμπί άντλησης', () => {
+  assert.ok(source.includes('"Σύνδεσμος ΚΗΜΔΗΣ ↗"'), 'ο σύνδεσμος πρέπει να λέει ότι είναι σύνδεσμος');
+  assert.ok(source.includes('"🔎 Άντληση από ΚΗΜΔΗΣ"'), 'το κουμπί άντλησης πρέπει να ξεχωρίζει');
+  assert.ok(!source.includes('},"ΚΗΜΔΗΣ ↗")'), 'η παλιά διφορούμενη ετικέτα δεν πρέπει να έχει μείνει');
 });
