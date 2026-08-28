@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self';script-src 'self' file: 'sha256-NLpLpNcz/YNRtPjxWZxYhJhG/C9dgIDbxNMbQT8EKjY=' 'sha256-VkpKRfyx+KpPV2QLcczOQKv4kgWd2uSsyA5ZB/GJq00='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; connect-src https://omncqldgtkdcjpqfwwlr.supabase.co wss://omncqldgtkdcjpqfwwlr.supabase.co https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self';script-src 'self' file: 'sha256-NLpLpNcz/YNRtPjxWZxYhJhG/C9dgIDbxNMbQT8EKjY=' 'sha256-ISbAPwvXAjfzKLjluZ6LDd0Z3minE+GZWVezcIME0/8='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; connect-src https://omncqldgtkdcjpqfwwlr.supabase.co wss://omncqldgtkdcjpqfwwlr.supabase.co https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'">
 <title>Δήμος Ρόδου · Προμήθειες &amp; Υπηρεσίες v36.6.6 PRODUCTION RESILIENCE</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3043,6 +3043,67 @@ async function loadLocked(){
   LOCKED_HISTORY=awardGroup?all:[];
   CAP_LOCKED=awardGroup?all.filter(r=>r.record_status!=='cancelled'):[];
   LOCKED=CAP_LOCKED.filter(r=>String(r.municipal_unit_id)===String(cur.unitId)).sort((a,b)=>Number(a.seq||0)-Number(b.seq||0));
+  await loadGroupUsage();
+}
+/* Απορρόφηση του κοινού ορίου των 30.000 € ανά ομοειδές αντικείμενο, για την
+   ΟΜΑΔΑ Δημοτικών Ενοτήτων στην οποία ανήκει η επιλεγμένη Δ.Ε. Το όριο είναι
+   κοινό για όλη την τετράδα, οπότε η απορρόφηση υπολογίζεται σε όλες τις Δ.Ε.
+   της ομάδας — όχι μόνο στην τρέχουσα.
+
+   Το loadLocked φέρνει μόνο την επιλεγμένη ομάδα υλικών· εδώ χρειάζονται όλες
+   ταυτόχρονα, ώστε κάθε πλήκτρο να δείχνει τη δική του κατάσταση. */
+let GROUP_USED={};
+async function loadGroupUsage(){
+  GROUP_USED={};
+  if(!cur.unitId||cur.unitId===CENTRAL_UNIT){paintGrpNav();return;}
+  const awardGroup=currentAwardGroup();
+  if(!awardGroup){paintGrpNav();return;}
+  const unitIds=awardGroupUnitIds(awardGroup);
+  if(!unitIds.length){paintGrpNav();return;}
+  const {data,error}=await sb.from('locked_studies')
+    .select('group_id,net_total,record_status')
+    .in('municipal_unit_id',unitIds).eq('request_year',YEAR);
+  if(error){console.warn('loadGroupUsage',error);paintGrpNav();return;}
+  (data||[]).forEach(r=>{
+    if(r.record_status==='cancelled')return;
+    const k=String(r.group_id);
+    GROUP_USED[k]=Math.round(((GROUP_USED[k]||0)+Number(r.net_total||0))*100)/100;
+  });
+  paintGrpNav();
+}
+/* Το πλήκτρο γεμίζει από αριστερά όσο απορροφάται το όριο, και το χρώμα
+   κλιμακώνεται καθώς πλησιάζει. Έτσι φαίνεται με μια ματιά ποια ομοειδή
+   αντικείμενα έχουν περιθώριο και ποια όχι. */
+function groupUsageTint(pct){
+  if(pct>=100)return'rgba(220,38,38,.30)';
+  if(pct>=90)return'rgba(220,38,38,.22)';
+  if(pct>=70)return'rgba(217,119,6,.22)';
+  return'rgba(37,99,235,.18)';
+}
+function paintGrpNav(){
+  const nav=$('#grpNav');if(!nav)return;
+  const cap=directAwardCap()||DEFAULT_DIRECT_AWARD_CAP;
+  [...nav.children].forEach(b=>{
+    if(!b.dataset||!b.dataset.gid)return;
+    const used=GROUP_USED[String(b.dataset.gid)]||0;
+    let tag=b.querySelector('.usage');
+    if(!(used>0)||!(cap>0)){
+      if(tag)tag.remove();
+      b.style.removeProperty('background-image');
+      b.removeAttribute('title');
+      return;
+    }
+    const pct=Math.min(100,Math.round(used/cap*1000)/10);
+    b.style.backgroundImage='linear-gradient(90deg,'+groupUsageTint(pct)+' 0 '+pct+'%,transparent '+pct+'% 100%)';
+    b.title='Απορρόφηση ομάδας Δ.Ε.: '+fmtE(used)+' από '+fmtE(cap)+' · υπόλοιπο '+fmtE(Math.round((cap-used)*100)/100);
+    if(!tag){
+      tag=document.createElement('span');tag.className='usage';
+      tag.style.marginLeft='6px';tag.style.fontSize='11px';tag.style.fontWeight='700';
+      tag.style.opacity='.85';b.appendChild(tag);
+    }
+    tag.textContent=fmtN(pct)+'%';
+    tag.style.color=pct>=90?'#b91c1c':(pct>=70?'#b45309':'#1d4ed8');
+  });
 }
 function lockedNetSum(){return Math.round(CAP_LOCKED.reduce((s,r)=>s+Number(r.net_total||0),0)*100)/100;}
 const LOCK_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
@@ -5871,33 +5932,25 @@ function renderWorkspace(content){
     }else{
       box.append(el("p",{class:"mo-muted",style:"margin:0"},"Δεν έχει καταχωρηθεί ανάθεση για τη μελέτη — η καταχώριση γίνεται από τον χρήστη της Δ.Ε. ή τον διαχειριστή."));
     }
+    box.append(el("div",{class:"mo-muted",style:"font-size:12px;margin-top:14px;border-top:1px solid var(--line);padding-top:10px"},
+      "Τα παρακάτω συμπληρώνονται αυτόματα μόλις καταχωριστεί ο ΑΔΑΜ της σύμβασης:"));
+    box.append(renderContractFields(stdy,null,null));
     content.append(box);
     if(st.orders.length){content.append(el("div",{style:"margin-top:14px"}));renderRegistry(content);}
     return;
   }
   const sup=byId(st.suppliers,st.contract.supplier_id)||{};
+  /* Ίδια λίστα πεδίων με την αχνή προεπισκόπηση της ασυμβασιοποίητης μελέτης:
+     ό,τι φαινόταν κενό, εδώ είναι συμπληρωμένο. */
+  const kimdisPdfHref=kimdisLinkFor((st.contract.kimdis&&st.contract.kimdis.adam)||st.contract.adam);
   content.append(el("div",{class:"mo-card mo-pad mo-conline"},
     el("div",{},
-      el("b",{},LBL().partyLbl+": "+(sup.name||"—")),
-      el("div",{class:"mo-muted",style:"font-size:12.5px"},
-        (sup.email?("✉ "+sup.email+"  "):"")+(sup.viber_phone?("📱 "+sup.viber_phone+"  "):"")+(sup.afm?("ΑΦΜ "+sup.afm):"")),
-      el("div",{class:"mo-muted",style:"font-size:12.5px"},
-        (st.contract.adam?("ΑΔΑΜ "+st.contract.adam+" · "):"")+(st.contract.protocol_no?(st.contract.protocol_no+" · "):"")+
-        dGR(st.contract.start_date)+"–"+dGR(st.contract.end_date)),
-      (function(){
-        /* Ό,τι αντλήθηκε από το ΚΗΜΔΗΣ φαίνεται και εδώ, μαζί με σύνδεσμο προς
-           το πρωτότυπο PDF της σύμβασης. */
-        const km=st.contract.kimdis;
-        if(!km||typeof km!=="object")return null;
-        const bits=[km.aaht?("Α/Α ΕΣΗΔΗΣ "+km.aaht):null,km.ada?("ΑΔΑ "+km.ada):null,
-          km.cpv_code?("CPV "+km.cpv_code):null,km.procedure_type,km.organization].filter(Boolean);
-        const href=kimdisLinkFor(km.adam||st.contract.adam);
-        return el("div",{class:"mo-muted",style:"font-size:12.5px"},
-          bits.join(" · "),
-          href?el("a",{href:href,target:"_blank",rel:"noopener",class:"mo-link",style:"margin-left:8px"},"⬇ Σύμβαση (PDF)"):null);
-      })(),
-      el("div",{class:"mo-muted",style:"font-size:12.5px"},
-        "Εκτιμώμενη: "+eur(st.contract.estimated_amount!=null?st.contract.estimated_amount:stdy.net_total)+" · Συμβατική: "+eur(st.contract.total_amount)+" · "+contractPricingModeLabel(st.contract)))));
+      el("div",{style:"display:flex;gap:10px;align-items:center;flex-wrap:wrap"},
+        el("b",{},LBL().partyLbl+": "+(sup.name||"—")),
+        kimdisPdfHref?el("a",{href:kimdisPdfHref,target:"_blank",rel:"noopener",class:"mo-btn mo-sm"},"⬇ Σύμβαση (PDF)"):null),
+      (sup.email||sup.viber_phone)?el("div",{class:"mo-muted",style:"font-size:12.5px;margin-top:2px"},
+        (sup.email?("✉ "+sup.email+"  "):"")+(sup.viber_phone?("📱 "+sup.viber_phone):"")):null,
+      renderContractFields(stdy,st.contract,sup))));
   /* tabs */
   const tabs=el("div",{class:"mo-tabs"},
     el("button",{class:"mo-tab"+(st.view==="new"?" mo-on":""),onclick:()=>{st.view="new";renderAll();}},
@@ -5916,6 +5969,45 @@ function contractPricingModeLabel(c){
   if(m==="discount")return "Ενιαία έκπτωση "+qy(c.discount_pct||0)+"%";
   if(m==="item_prices")return "Κατακυρωμένες τιμές ανά είδος";
   return "Τιμές μελέτης";
+}
+/* Τα ίδια πεδία εμφανίζονται πριν και μετά τη συμβασιοποίηση. Πριν, αχνά και
+   κενά: η κλειδωμένη μελέτη δείχνει τι θα συμπληρωθεί μόλις οριστεί ο ανάδοχος
+   και αντληθούν τα στοιχεία από το ΚΗΜΔΗΣ. Μία λίστα, ώστε ό,τι φαίνεται αχνό
+   να είναι ακριβώς αυτό που θα γεμίσει. */
+function contractFieldRows(stdy,contract,sup){
+  const km=(contract&&contract.kimdis&&typeof contract.kimdis==="object")?contract.kimdis:{};
+  const v=x=>(x==null||x==="")?null:String(x);
+  const dates=contract&&(contract.start_date||contract.end_date)
+    ? dGR(contract.start_date)+" – "+dGR(contract.end_date) : null;
+  return [
+    [LBL().partyLbl, v(sup&&sup.name)||v(km.supplier_name)],
+    ["Α.Φ.Μ. αναδόχου", v(sup&&sup.afm)||v(km.supplier_afm)],
+    ["ΑΔΑΜ σύμβασης", v(contract&&contract.adam)],
+    ["Αριθμός σύμβασης", v(contract&&contract.protocol_no)],
+    ["Διάρκεια", dates],
+    ["Εκτιμώμενη αξία μελέτης", eur(stdy.net_total)],
+    ["Συμβατική αξία", contract&&contract.total_amount!=null?eur(contract.total_amount):null],
+    ["Έκπτωση", contract?contractPricingModeLabel(contract):null],
+    ["Τίτλος σύμβασης", v(km.title)],
+    ["Α/Α ΕΣΗΔΗΣ", v(km.aaht)],
+    ["ΑΔΑ απόφασης", v(km.ada)],
+    ["CPV", km.cpv_code?(km.cpv_code+(km.cpv_label?(" — "+km.cpv_label):"")):null],
+    ["Διαδικασία", v(km.procedure_type)],
+    ["Νομικό πλαίσιο", v(km.legal_context)],
+    ["Αναθέτουσα αρχή", v(km.organization)],
+    ["Υπογράφων", v(km.signer)],
+    ["Εντολές πληρωμής", Array.isArray(km.payments)&&km.payments.length?km.payments.join(", "):null]
+  ];
+}
+function renderContractFields(stdy,contract,sup){
+  const grid=el("div",{style:"display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:12.5px;margin-top:8px"});
+  contractFieldRows(stdy,contract,sup).forEach(r=>{
+    grid.append(el("div",{class:"mo-muted"},r[0]));
+    grid.append(r[1]!=null
+      ? el("div",{},r[1])
+      : el("div",{class:"mo-muted",style:"opacity:.45"},"—"));
+  });
+  return grid;
 }
 function contractPricingRows(stdy,existing){
   const src=existing?(st.citems||[]):(stdy.lines||[]);
