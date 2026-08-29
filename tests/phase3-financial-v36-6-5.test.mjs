@@ -76,9 +76,10 @@ async function savePricingContract(db,x,{mode='study',discount=0,itemPrices=null
 
 async function contractItem(db,contractId){return (await db.query(`select * from public.mo_contract_items where contract_id=$1 order by id limit 1`,[contractId])).rows[0];}
 
-function orderPayload(item,{qty=1,customPrice=null,mapQty=null}={}){
+function orderPayload(item,{qty=1,customPrice=null,mapQty=null,mapping=undefined}={}){
   if(customPrice!=null){
-    return JSON.stringify([{contract_item_id:null,quantity:qty,unit_price:customPrice,description:'Εκτός τιμολογίου',unit:'τεμ.',mapping:[{contract_item_id:String(item.id),qty:mapQty??qty}]}]);
+    const map=mapping!==undefined?mapping:[{contract_item_id:String(item.id),qty:mapQty??qty}];
+    return JSON.stringify([{contract_item_id:null,quantity:qty,unit_price:customPrice,description:'Εκτός τιμολογίου',unit:'τεμ.',mapping:map}]);
   }
   return JSON.stringify([{contract_item_id:String(item.id),quantity:qty,unit_price:Number(item.unit_price),description:item.description,unit:item.unit}]);
 }
@@ -143,18 +144,37 @@ test('εκδοθέν δελτίο δεν μπορεί να υπερβεί το �
   }finally{await db.close();}
 });
 
-test('η «χρέωση ως» σε έκδοση απαιτεί ακριβή ίση αξία και όχι απλή υπερκάλυψη',async()=>{
+test('η «χρέωση ως» δεν απαιτεί ίση αξία — αρκεί να δηλώνει συμβατικό είδος',async()=>{
+  const db=await install();
+  try{
+    const x=await prepareStudy(db);
+    const c=await savePricingContract(db,x,{mode:'study'});
+    const item=await contractItem(db,c.contract_id);
+    // Υποκάλυψη: γραμμή 4 € χρεωμένη ως 1 τεμ. × 5 € — εκδίδεται κανονικά.
+    const under=await scalar(db,`select public.save_order_atomic(null,$1,date '2026-08-15',$2,'Test',null,24,$3::jsonb,true)`,[x.lock.study_id,String(x.receiverId),orderPayload(item,{customPrice:4,mapQty:1})]);
+    assert.equal(under.status,'issued');
+    assert.equal(Number(await scalar(db,`select subtotal from public.mo_orders where id=$1`,[under.order_id])),4);
+    // Υπερκάλυψη: γραμμή 6 € χρεωμένη ως 2 τεμ. × 5 € — επίσης εκδίδεται.
+    const over=await scalar(db,`select public.save_order_atomic(null,$1,date '2026-08-15',$2,'Test',null,24,$3::jsonb,true)`,[x.lock.study_id,String(x.receiverId),orderPayload(item,{customPrice:6,mapQty:2})]);
+    assert.equal(over.status,'issued');
+    // Το ΧΡΗΜΑ που δεσμεύτηκε είναι η πραγματική αξία των γραμμών, όχι της αντιστοίχισης.
+    assert.equal(Number(await scalar(db,`select round(sum(subtotal),2) from public.mo_orders where contract_id=$1 and status in ('issued','sent','received')`,[c.contract_id])),10);
+  }finally{await db.close();}
+});
+
+test('εκδοθείσα γραμμή εκτός τιμολογίου χωρίς καμία αντιστοίχιση απορρίπτεται',async()=>{
   const db=await install();
   try{
     const x=await prepareStudy(db);
     const c=await savePricingContract(db,x,{mode:'study'});
     const item=await contractItem(db,c.contract_id);
     await assert.rejects(
-      db.query(`select public.save_order_atomic(null,$1,date '2026-08-15',$2,'Test',null,24,$3::jsonb,true)`,[x.lock.study_id,String(x.receiverId),orderPayload(item,{customPrice:4,mapQty:1})]),
-      /χρέωση ως.*ακριβώς ίση/i
+      db.query(`select public.save_order_atomic(null,$1,date '2026-08-15',$2,'Test',null,24,$3::jsonb,true)`,[x.lock.study_id,String(x.receiverId),orderPayload(item,{customPrice:4,mapping:[]})]),
+      /τουλάχιστον μία αντιστοίχιση/i
     );
-    const ok=await scalar(db,`select public.save_order_atomic(null,$1,date '2026-08-15',$2,'Test',null,24,$3::jsonb,true)`,[x.lock.study_id,String(x.receiverId),orderPayload(item,{customPrice:5,mapQty:1})]);
-    assert.equal(ok.status,'issued');
+    // Ως πρόχειρο επιτρέπεται: η τεκμηρίωση απαιτείται μόνο κατά την έκδοση.
+    const draft=await scalar(db,`select public.save_order_atomic(null,$1,date '2026-08-15',$2,'Test',null,24,$3::jsonb,false)`,[x.lock.study_id,String(x.receiverId),orderPayload(item,{customPrice:4,mapping:[]})]);
+    assert.equal(draft.status,'draft');
   }finally{await db.close();}
 });
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self';script-src 'self' file: 'sha256-NLpLpNcz/YNRtPjxWZxYhJhG/C9dgIDbxNMbQT8EKjY=' 'sha256-ISbAPwvXAjfzKLjluZ6LDd0Z3minE+GZWVezcIME0/8='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; connect-src https://omncqldgtkdcjpqfwwlr.supabase.co wss://omncqldgtkdcjpqfwwlr.supabase.co https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self';script-src 'self' file: 'sha256-NLpLpNcz/YNRtPjxWZxYhJhG/C9dgIDbxNMbQT8EKjY=' 'sha256-gEpZxXFV5CAAKYWAmLItyycOi59mI23gnh65jK7lSlY='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; connect-src https://omncqldgtkdcjpqfwwlr.supabase.co wss://omncqldgtkdcjpqfwwlr.supabase.co https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'">
 <title>Δήμος Ρόδου · Προμήθειες &amp; Υπηρεσίες v36.6.6 PRODUCTION RESILIENCE</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -6443,10 +6443,13 @@ function renderOrderForm(root){
         const cost=num(it.quantity)*num(it.unit_price);
         const cov=mappingCovered(it);
         const has=parseMapping(it).length>0;
-        const warn=cost>0&&cov<cost-0.005;
+        const warn=cost>0&&!has;
+        const d=Math.round((cov-cost)*100)/100;
         extra.append(el("button",{class:"mo-btn mo-sm mo-ghost mo-maplink"+(warn?" mo-mapwarn":""),type:"button",
-          disabled:editable?null:"",onclick:()=>openMappingModal(it)},
-          "⇄ "+(has?("αντιστοίχιση: "+eur(cov)+(cost>0?(" / "+eur(cost)):"")):"χωρίς αντιστοίχιση — όρισε")));
+          disabled:editable?null:"",
+          title:has?"Οι συμβατικές ποσότητες που αναλώνει η γραμμή. Δεν χρειάζεται να συμπίπτουν σε αξία.":"",
+          onclick:()=>openMappingModal(it)},
+          "⇄ "+(has?("αντιστοίχιση: "+eur(cov)+(cost>0?(" / "+eur(cost)+(Math.abs(d)>0.005?("  ("+(d>0?"+":"−")+eur(Math.abs(d))+")"):"")):"")):"χωρίς αντιστοίχιση — όρισε")));
       }
     }
     function updateLineSum(){sumCell.textContent=eur(num(it.quantity)*num(it.unit_price));refreshExtra();}
@@ -6512,9 +6515,9 @@ function renderOrderForm(root){
     const totEl=el("b",{});
     const covered=()=>{let s=0;sel.forEach((qv,id)=>{const ci=byId(st.citems,id);if(ci)s+=qv*num(ci.unit_price);});return s;};
     function refreshTot(){
-      const c=covered(),d=c-cost;
-      totEl.textContent=eur(c)+" / "+eur(cost)+"  ("+(d>=0?"+":"")+eur(d)+")";
-      totEl.style.color=c<cost-0.005?"var(--mo-err)":"var(--mo-ok)";
+      const c=covered(),d=Math.round((c-cost)*100)/100;
+      totEl.textContent=eur(c)+" / "+eur(cost)+"  ("+(d>=0?"+":"−")+eur(Math.abs(d))+")";
+      totEl.style.color=c<=0?"var(--mo-err)":"var(--mo-ok)";
     }
     const rows=st.citems.map(ci=>{
       const ciKey=String(ci.id);
@@ -6539,12 +6542,14 @@ function renderOrderForm(root){
     refreshTot();
     const body=el("div",{},
       el("p",{class:"mo-muted",style:"margin-top:0"},
-        "Το είδος «"+line.description+"» ("+eur(cost)+") δεν υπάρχει στο τιμολόγιο. Επιλέξτε με ποια είδη της σύμβασης θα χρεωθεί ισόποσα — η ισοδύναμη ποσότητα υπολογίζεται αυτόματα."),
+        "Το είδος «"+line.description+"» ("+eur(cost)+") δεν υπάρχει στο τιμολόγιο. Επιλέξτε με ποια είδη της σύμβασης χρεώνεται — η ισοδύναμη ποσότητα προτείνεται αυτόματα και διορθώνεται ελεύθερα. "),
+      el("p",{class:"mo-muted",style:"margin-top:0;font-size:12px"},
+        "Δεν χρειάζεται να βγει ακριβώς το ίδιο ποσό: η αντιστοίχιση αναλώνει συμβατικές ποσότητες, ενώ από το συμβατικό υπόλοιπο αφαιρείται πάντα η πραγματική αξία της γραμμής ("+eur(cost)+")."),
       el("div",{class:"mo-tablewrap",style:"max-height:46vh"},el("table",{class:"mo-mtable"},
         el("thead",{},el("tr",{},el("th",{style:"width:34px"},""),el("th",{},"Είδος σύμβασης"),el("th",{style:"width:110px"},"Ισοδ. ποσότητα"))),
         el("tbody",{},...rows))),
       el("div",{style:"margin-top:12px;font-size:14px"},"Κάλυψη: ",totEl));
-    openModal("Αντιστοίχιση με είδη σύμβασης",body,[
+    openModal("Αντιστοίχιση με είδη σύμβασης («χρέωση ως»)",body,[
       {label:"Καθαρισμός",cls:"mo-btn",act:()=>{line.mapping=[];markDirty();closeModal();renderItemsTable();renderBalance();}},
       {label:"Άκυρο",cls:"mo-btn",act:closeModal},
       {label:"Αποθήκευση αντιστοίχισης",cls:"mo-btn mo-primary",act:()=>{
@@ -6572,7 +6577,7 @@ function renderOrderForm(root){
         el("b",{style:"color:"+(afterRem<-0.005?"var(--mo-err)":"inherit")},eur(afterRem))));
     }
     if(afterRem<-0.005)balHost.append(el("div",{class:"mo-callout mo-cerr"},"⛔ Αυστηρό όριο: το δελτίο υπερβαίνει το διαθέσιμο υπόλοιπο της μελέτης και ΔΕΝ θα εκδοθεί. Μειώστε ποσότητες."));
-    const overQty=[];let mappingMismatch=0;
+    const overQty=[];let mappingMissing=0,mappingDiff=0;
     f.items.forEach(it=>{
       if(it.ref){
         const rem=itemRemainingQty(it.ref,f.id);
@@ -6582,11 +6587,15 @@ function renderOrderForm(root){
         }
       }else{
         const c=num(it.quantity)*num(it.unit_price);
-        if(c>0&&Math.abs(mappingCovered(it)-c)>0.005)mappingMismatch++;
+        if(c<=0)return;
+        if(!parseMapping(it).length){mappingMissing++;return;}
+        mappingDiff+=mappingCovered(it)-c;
       }
     });
+    mappingDiff=Math.round(mappingDiff*100)/100;
     if(overQty.length)balHost.append(el("div",{class:"mo-callout mo-cerr"},"⛔ Υπέρβαση συμβατικής ποσότητας: "+overQty.join(" · ")));
-    if(mappingMismatch)balHost.append(el("div",{class:"mo-callout mo-cerr"},"⇄ "+(mappingMismatch===1?"1 είδος εκτός τιμολογίου δεν έχει":mappingMismatch+" είδη εκτός τιμολογίου δεν έχουν")+" ακριβώς ίση συμβατική αξία στην «χρέωση ως» — πατήστε «⇄» στη γραμμή."));
+    if(mappingMissing)balHost.append(el("div",{class:"mo-callout mo-cerr"},"⇄ "+(mappingMissing===1?"1 είδος εκτός τιμολογίου δεν έχει":mappingMissing+" είδη εκτός τιμολογίου δεν έχουν")+" αντιστοίχιση — πατήστε «⇄» στη γραμμή και δηλώστε πού χρεώνεται."));
+    else if(Math.abs(mappingDiff)>0.005)balHost.append(el("div",{class:"mo-callout"},"⇄ Η «χρέωση ως» αναλώνει συμβατικές ποσότητες αξίας "+(mappingDiff>0?"+":"−")+eur(Math.abs(mappingDiff))+" σε σχέση με τις ελεύθερες γραμμές. Δεν εμποδίζει την έκδοση: από τη σύμβαση αφαιρείται η πραγματική αξία του δελτίου."));
   }
   renderBalance();
   const cNotes=el("div",{class:"mo-card mo-pad"});right.append(cNotes);
@@ -6648,10 +6657,8 @@ function validate(o,forIssue){
   if(!o.usage_location)errs.push("Δηλώστε πού θα χρησιμοποιηθεί (ελεύθερη περιγραφή).");
   if(forIssue){
     for(const it of o.items){
-      if(it.is_custom){
-        const c=it.quantity*it.unit_price;
-        const cov=parseMapping(it).reduce((s,m)=>{const ci=byId(st.citems,m.contract_item_id);return s+(ci?num(m.qty)*num(ci.unit_price):0);},0);
-        if(c>0&&Math.abs(cov-c)>0.005){errs.push("Το είδος «"+it.description+"» είναι εκτός τιμολογίου — η «χρέωση ως» πρέπει να έχει ακριβώς ίση συμβατική αξία (⇄).");break;}
+      if(it.is_custom&&it.quantity*it.unit_price>0.005&&!parseMapping(it).length){
+        errs.push("Το είδος «"+it.description+"» είναι εκτός τιμολογίου — δηλώστε με «⇄» σε ποια είδη της σύμβασης χρεώνεται. Δεν χρειάζεται ίσο ποσό.");break;
       }
     }
     for(const it of o.items){
