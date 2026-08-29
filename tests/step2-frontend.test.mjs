@@ -74,7 +74,8 @@ test('το frontend v36.6.6 χρησιμοποιεί πραγματικές συ
   assert.match(source, /p_import_token:importContext\.exportToken/);
   assert.match(source, /Οικονομική προσφορά \/ συμβατικές τιμές/);
   assert.match(source, /Συμβατική καθαρή αξία/);
-  assert.match(source, /Math\.abs\(cov-c\)>0\.005/);
+  // Η «χρέωση ως» τεκμηριώνει, δεν εξισώνει: μπλοκάρει μόνο η απουσία αντιστοίχισης.
+  assert.match(source, /it\.is_custom&&it\.quantity\*it\.unit_price>0\.005&&!parseMapping\(it\)\.length/);
   assert.match(source, /p_pricing_mode:mode/);
   assert.doesNotMatch(source, /function isIntegerQuantityMaterial\(\)\{return true;\}/);
   assert.doesNotMatch(source, /const byId=\(arr,id\)=>\(arr\|\|\[\]\)\.find\(x=>x\.id===id\)/);

@@ -106,7 +106,8 @@ custom_values as (
     round(coalesce(sum(
       case when coalesce(mp.value->>'qty','') ~ '^[+]?[0-9]+([.][0-9]+)?$'
         then (mp.value->>'qty')::numeric*coalesce(ci.unit_price,0) else 0 end
-    ),0),2) as mapped_value
+    ),0),2) as mapped_value,
+    count(mp.value)::int as mapping_entries
   from public.mo_order_items oi
   join public.mo_orders o on o.id=oi.order_id
   left join lateral jsonb_array_elements(
@@ -119,9 +120,13 @@ custom_values as (
   group by oi.id,oi.order_id,oi.line_total
 ),
 custom_violations as (
+  -- Η αντιστοίχιση δεν απαιτείται να ισούται σε αξία με την ελεύθερη γραμμή:
+  -- αναλώνει συμβατικές ΠΟΣΟΤΗΤΕΣ, ενώ το ΧΡΗΜΑ δεσμεύεται από το subtotal του
+  -- δελτίου. Παραβίαση είναι μόνο η εκδοθείσα ελεύθερη γραμμή χωρίς καμία
+  -- αντιστοίχιση· η διαφορά αξίας καταγράφεται ως πληροφορία.
   select
     count(*)::int as issued_custom_lines,
-    count(*) filter(where abs(mapped_value-coalesce(line_total,0))>0.005)::int as custom_charge_as_value_mismatch,
+    count(*) filter(where mapping_entries=0)::int as custom_charge_as_missing_mapping,
     coalesce(max(abs(mapped_value-coalesce(line_total,0))),0) as max_custom_value_difference
   from custom_values
 ),
@@ -197,7 +202,7 @@ select jsonb_pretty(jsonb_build_object(
     'contract_total_vs_items_mismatch',0,
     'contract_estimate_vs_locked_study_mismatch',0,
     'contracts_with_orders_above_actual_contract_total',0,
-    'custom_charge_as_value_mismatch',0,
+    'custom_charge_as_missing_mapping',0,
     'scopes_over_cap',0,
     'scopes_with_non_30000_cap',0,
     'canonical_groups',true,
